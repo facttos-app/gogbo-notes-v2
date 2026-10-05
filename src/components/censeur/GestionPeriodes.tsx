@@ -130,7 +130,7 @@ export const GestionPeriodes: React.FC = () => {
                 <div className="pt-3 border-t border-slate-200 flex flex-col space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-600">État de la saisie :</span>
-                    {p.is_locked ? (
+                    {p?.is_locked ? (
                       <span className="inline-flex items-center space-x-1 text-red-700 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-200 text-[11px]">
                         <Lock className="w-3 h-3" />
                         <span>Verrouillé</span>
@@ -156,13 +156,13 @@ export const GestionPeriodes: React.FC = () => {
                       <button
                         onClick={() => handleToggleLock(p.id)}
                         className={`flex-1 py-1.5 px-2 rounded text-xs font-medium transition-colors flex items-center justify-center space-x-1 cursor-pointer ${
-                          p.is_locked
+                          p?.is_locked
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                             : 'bg-red-600 hover:bg-red-700 text-white'
                         }`}
                       >
-                        {p.is_locked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                        <span>{p.is_locked ? 'Déverrouiller' : 'Verrouiller'}</span>
+                        {p?.is_locked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                        <span>{p?.is_locked ? 'Déverrouiller' : 'Verrouiller'}</span>
                       </button>
                     </div>
                   )}

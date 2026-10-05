@@ -28,6 +28,7 @@ interface AuthContextType {
   isConcepteur: boolean;
   isSurveillant: boolean;
   isComptable: boolean;
+  isParent: boolean;
   hasPedagogicalAssignments: boolean;
 }
 
@@ -54,31 +55,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setCurrentUser(null);
       setAffectations([]);
-      localStorage.removeItem(CURRENT_USER_KEY);
+      storage.clearCurrentUser();
     }
   };
 
   useEffect(() => {
-    storage.init();
-    // Conserver la session existante si connectée
-    const storedId = localStorage.getItem(CURRENT_USER_KEY);
-    loadUserData(storedId);
-    setIsLoading(false);
+    try {
+      storage.init();
+      // Conserver la session existante si connectée
+      const storedId = storage.getCurrentUserId();
+      loadUserData(storedId);
+    } catch (e) {
+      console.warn('AuthContext init notice:', e);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const login = async (email: string, pass: string, portalTarget?: 'ADMIN' | 'ENSEIGNANT'): Promise<{ success: boolean; error?: string }> => {
+  const login = async (
+    emailOrPhone: string, 
+    pass: string, 
+    portalTarget?: 'ADMIN' | 'ENSEIGNANT' | 'PARENT'
+  ): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const cleanEmail = email.trim().toLowerCase();
+      const cleanInput = emailOrPhone.trim().toLowerCase();
+      const cleanDigits = cleanInput.replace(/[^0-9]/g, '');
       const cleanPass = pass.trim();
 
       // Tentative Supabase Auth si configuré
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && cleanInput.includes('@')) {
         const supabase = getSupabaseClient();
         if (supabase) {
           try {
             await supabase.auth.signInWithPassword({
-              email: cleanEmail,
+              email: cleanInput,
               password: cleanPass,
             });
           } catch (e) {
@@ -88,12 +99,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const profiles = storage.getProfiles();
-      const user = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+      let user = profiles.find((p) => p.email.toLowerCase() === cleanInput);
+      if (!user && cleanDigits.length >= 8) {
+        user = profiles.find((p) => p.telephone && p.telephone.replace(/[^0-9]/g, '').endsWith(cleanDigits));
+      }
+      if (!user) {
+        const parent = storage.getParentByPhoneOrEmail(cleanInput);
+        if (parent && parent.profile_id) {
+          user = storage.getProfileById(parent.profile_id);
+        }
+      }
 
       // 1. Vérification de l'existence de l'identifiant et du mot de passe
       if (!user) {
         setIsLoading(false);
-        return { success: false, error: 'Identifiant ou mot de passe incorrect.' };
+        return { success: false, error: 'Identifiant (e-mail ou téléphone) ou mot de passe incorrect.' };
       }
 
       const isPasswordValid = storage.verifyUserPassword(user.id, cleanPass);
@@ -114,23 +134,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
           return {
             success: false,
-            error: "Accès refusé au Portail Administration : Ce compte possède un rôle Enseignant. Veuillez vous connecter via le « Portail Enseignants ».",
+            error: "Accès refusé au Portail Administration : Ce compte ne possède pas d'habilitation administrative.",
           };
         }
       } else if (portalTarget === 'ENSEIGNANT') {
-        // Double casquette : Enseignant titulaire, Censeur enseignant, DG enseignant ou affectations actives
         const hasAffectations = storage.getAffectationsByProfile(user.id).length > 0;
         const canTeach = user.is_enseignant || user.role === 'ENSEIGNANT' || hasAffectations;
         if (!canTeach) {
           setIsLoading(false);
           return {
             success: false,
-            error: "Accès refusé au Portail Enseignants : Ce compte administratif n'exerce aucune fonction pédagogique active. Veuillez utiliser le « Portail Administration ».",
+            error: "Accès refusé au Portail Enseignants : Ce compte n'exerce aucune fonction pédagogique active.",
+          };
+        }
+      } else if (portalTarget === 'PARENT') {
+        if (user.role !== 'PARENT') {
+          setIsLoading(false);
+          return {
+            success: false,
+            error: "Accès refusé à l'Espace Parents : Ce compte est un compte du personnel scolaire. Veuillez vous connecter via le Portail Administration ou Enseignants.",
           };
         }
       }
 
-      localStorage.setItem(CURRENT_USER_KEY, user.id);
+      // Interdire l'accès des comptes parents aux portails du personnel
+      if (user.role === 'PARENT' && portalTarget !== 'PARENT') {
+        setIsLoading(false);
+        return {
+          success: false,
+          error: "Accès refusé : Ce compte est un compte Parent d'Élève. Veuillez utiliser l'« Espace Parents ».",
+        };
+      }
+
+      storage.setCurrentUserId(user.id);
       loadUserData(user.id);
 
       storage.addAuditLog({
@@ -165,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         details: `Déconnexion de ${currentUser.nom} ${currentUser.prenom}`,
       });
     }
-    localStorage.removeItem(CURRENT_USER_KEY);
+    storage.clearCurrentUser();
     setCurrentUser(null);
     setAffectations([]);
   };
@@ -202,7 +238,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchUser = (profileId: string) => {
-    localStorage.setItem(CURRENT_USER_KEY, profileId);
+    storage.setCurrentUserId(profileId);
     loadUserData(profileId);
   };
 
@@ -218,6 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isConcepteur = currentUser?.role === 'CONCEPTEUR';
   const isSurveillant = currentUser?.role === 'SURVEILLANT_GENERAL';
   const isComptable = currentUser?.role === 'COMPTABLE';
+  const isParent = currentUser?.role === 'PARENT';
   const hasPedagogicalAssignments = affectations.length > 0;
 
   return (
@@ -240,6 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isConcepteur,
         isSurveillant,
         isComptable,
+        isParent,
         hasPedagogicalAssignments,
       }}
     >

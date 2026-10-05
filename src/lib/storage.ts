@@ -11,9 +11,26 @@ import {
   ParametresEcole,
   AnneeScolaire,
   EnregistrementPresence,
+  StatutPresence,
   PaiementContribution,
   PresenceEnseignant,
-  StatutPresenceEnseignant
+  StatutPresenceEnseignant,
+  ProfesseurPrincipal,
+  StatutProfesseurPrincipal,
+  ParentProfile,
+  ParentEleve,
+  IncidentDisciplinaire,
+  NotificationParent,
+  LienParental,
+  ContributionConfig,
+  DepenseBudgetaire,
+  NoteConduite,
+  PunitionScolaire,
+  StatutPunition,
+  SanctionDisciplinaire,
+  SeanceCours,
+  JourSemaine,
+  StatutSanction
 } from '../types';
 import { OFFICIAL_IDENTITY, OFFICIAL_CLASSES, OFFICIAL_MATIERES, OFFICIAL_PERIODES, OFFICIAL_ANNEES_SCOLAIRES } from './constants';
 import { getSupabaseClient, isSupabaseConfigured } from './supabase';
@@ -115,9 +132,21 @@ const STORAGE_KEYS = {
   NOTES: 'gogbo_v2_notes',
   PRESENCES: 'gogbo_v2_presences',
   PRESENCES_ENSEIGNANTS: 'gogbo_v2_presences_enseignants',
+  PROFESSEURS_PRINCIPAUX: 'gogbo_v2_professeurs_principaux',
   PAIEMENTS: 'gogbo_v2_paiements',
+  CONTRIBUTIONS: 'gogbo_v2_contributions',
+  DEPENSES: 'gogbo_v2_depenses',
+  PARENTS: 'gogbo_v2_parents',
+  PARENT_ELEVES: 'gogbo_v2_parent_eleves',
+  INCIDENTS_DISCIPLINAIRES: 'gogbo_v2_incidents_disciplinaires',
+  PUNITIONS: 'gogbo_v2_punitions',
+  SANCTIONS_DISCIPLINAIRES: 'gogbo_v2_sanctions_disciplinaires',
+  NOTES_CONDUITE: 'gogbo_v2_notes_conduite',
+  SEANCES_COURS: 'gogbo_v2_seances_cours',
+  NOTIFICATIONS_PARENTS: 'gogbo_v2_notifications_parents',
   AUDIT_LOGS: 'gogbo_v2_audit_logs',
   PARAMETRES: 'gogbo_v2_parametres',
+  COEFFICIENTS_CLASSES: 'gogbo_v2_coefficients_classes',
   VERSION: 'gogbo_v2_version',
 };
 
@@ -194,10 +223,138 @@ const SEED_PROFILES: UserProfile[] = [
     created_at: '2026-09-01T08:00:00Z',
     updated_at: '2026-09-01T08:00:00Z',
   },
+  {
+    id: 'usr-ens-aroua',
+    email: 'aroua@ceggogbo.bj',
+    nom: 'AROUA',
+    prenom: 'Barnabé',
+    role: 'ENSEIGNANT',
+    is_enseignant: true,
+    telephone: '+229 97 10 20 30',
+    adresse: 'Adjohoun - Quartier Gbada',
+    matiere: 'Histoire-Géographie',
+    statut: 'ACTIF',
+    created_at: '2026-09-01T08:00:00Z',
+    updated_at: '2026-09-01T08:00:00Z',
+  },
+  {
+    id: 'usr-ens-kponou',
+    email: 'kponou@ceggogbo.bj',
+    nom: 'KPONOU',
+    prenom: 'Marcel',
+    role: 'ENSEIGNANT',
+    is_enseignant: true,
+    telephone: '+229 97 11 22 44',
+    adresse: 'Adjohoun - Centre',
+    matiere: 'PCT',
+    statut: 'ACTIF',
+    created_at: '2026-09-01T08:00:00Z',
+    updated_at: '2026-09-01T08:00:00Z',
+  },
 ];
 
-// AUCUNE attribution de classe fictive : le Censeur ou le Concepteur les crée réellement.
-const SEED_AFFECTATIONS: AffectationPedagogique[] = [];
+// Attributions officielles de cours : Censeur (SVT en 4eA & 3eB) et DG (Mathématiques en Terminale D)
+const SEED_AFFECTATIONS: AffectationPedagogique[] = [
+  {
+    id: 'aff-aroua-hist-6a',
+    profile_id: 'usr-ens-aroua',
+    classe_id: 'cls-6a',
+    matiere_id: 'mat-hist',
+    heures_hebdo: 2,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-kponou-pct-4a',
+    profile_id: 'usr-ens-kponou',
+    classe_id: 'cls-4a',
+    matiere_id: 'mat-pct',
+    heures_hebdo: 3,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-censeur-svt-4a',
+    profile_id: 'usr-censeur',
+    classe_id: 'cls-4a',
+    matiere_id: 'mat-svt',
+    heures_hebdo: 4,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-censeur-svt-3b',
+    profile_id: 'usr-censeur',
+    classe_id: 'cls-3b',
+    matiere_id: 'mat-svt',
+    heures_hebdo: 4,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-dg-math-td',
+    profile_id: 'usr-dg',
+    classe_id: 'cls-td',
+    matiere_id: 'mat-math',
+    heures_hebdo: 6,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-prof-maths-6a',
+    profile_id: 'usr-prof-maths',
+    classe_id: 'cls-6a',
+    matiere_id: 'mat-math',
+    heures_hebdo: 4,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-prof-francais-comm-6a',
+    profile_id: 'usr-prof-francais',
+    classe_id: 'cls-6a',
+    matiere_id: 'mat-comm',
+    heures_hebdo: 3,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-prof-francais-lect-6a',
+    profile_id: 'usr-prof-francais',
+    classe_id: 'cls-6a',
+    matiere_id: 'mat-lect',
+    heures_hebdo: 3,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+  {
+    id: 'aff-prof-svt-6a',
+    profile_id: 'usr-prof-svt',
+    classe_id: 'cls-6a',
+    matiere_id: 'mat-svt',
+    heures_hebdo: 2,
+    annee_scolaire: '2026–2027',
+    statut: 'ACTIF',
+    created_at: '2026-09-05T09:00:00Z',
+    updated_at: '2026-09-05T09:00:00Z',
+  },
+];
 
 // AUCUN élève fictif : les vrais apprenants sont inscrits par le Censeur ou le Concepteur.
 const SEED_ELEVES: Eleve[] = [];
@@ -213,6 +370,18 @@ const SEED_PRESENCES: EnregistrementPresence[] = [];
 
 // AUCUN paiement fictif pré-enregistré.
 const SEED_PAIEMENTS: PaiementContribution[] = [];
+
+// AUCUNE contribution fictive : le Comptable configure les vraies contributions de l'école.
+const SEED_CONTRIBUTIONS: ContributionConfig[] = [];
+
+// AUCUNE dépense fictive : le Comptable saisit les dépenses réelles.
+const SEED_DEPENSES: DepenseBudgetaire[] = [];
+
+// AUCUNE donnée fictive pour les punitions, sanctions, notes de conduite et séances.
+const SEED_NOTES_CONDUITE: NoteConduite[] = [];
+const SEED_PUNITIONS: PunitionScolaire[] = [];
+const SEED_SANCTIONS: SanctionDisciplinaire[] = [];
+const SEED_SEANCES_COURS: SeanceCours[] = [];
 
 // Seed Audit Logs
 const SEED_AUDIT_LOGS: AuditLog[] = [
@@ -251,9 +420,45 @@ const SEED_AUDIT_LOGS: AuditLog[] = [
 ];
 
 class StorageEngine {
+  private memoryStore: Record<string, string> = {};
+
+  public rawGet(key: string): string | null {
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        const val = window.localStorage.getItem(key);
+        if (val !== null) return val;
+      }
+    } catch {
+      // Ignored: fallback to in-memory store
+    }
+    return this.memoryStore[key] ?? null;
+  }
+
+  public rawSet(key: string, value: string): void {
+    this.memoryStore[key] = value;
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {
+      // Ignored: memoryStore holds it safely
+    }
+  }
+
+  public rawRemove(key: string): void {
+    delete this.memoryStore[key];
+    try {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.removeItem(key);
+      }
+    } catch {
+      // Ignored
+    }
+  }
+
   private getItem<T>(key: string, defaultValue: T): T {
     try {
-      const data = localStorage.getItem(key);
+      const data = this.rawGet(key);
       if (!data) return defaultValue;
       return JSON.parse(data) as T;
     } catch {
@@ -263,9 +468,9 @@ class StorageEngine {
 
   private setItem<T>(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      this.rawSet(key, JSON.stringify(value));
     } catch (e) {
-      console.warn('LocalStorage error:', e);
+      console.warn('Storage setItem error:', e);
     }
   }
 
@@ -274,150 +479,336 @@ class StorageEngine {
   }
 
   public init(): void {
-    const initialized = localStorage.getItem(STORAGE_KEYS.VERSION);
-    if (!initialized) {
-      this.setItem(STORAGE_KEYS.PROFILES, SEED_PROFILES);
-      this.setItem(STORAGE_KEYS.CLASSES, OFFICIAL_CLASSES);
-      this.setItem(STORAGE_KEYS.MATIERES, OFFICIAL_MATIERES);
-      this.setItem(STORAGE_KEYS.ELEVES, SEED_ELEVES);
-      this.setItem(STORAGE_KEYS.INSCRIPTIONS, SEED_INSCRIPTIONS);
-      this.setItem(STORAGE_KEYS.PERIODES, OFFICIAL_PERIODES);
-      this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, OFFICIAL_ANNEES_SCOLAIRES);
-      this.setItem(STORAGE_KEYS.AFFECTATIONS, SEED_AFFECTATIONS);
-      this.setItem(STORAGE_KEYS.NOTES, SEED_NOTES);
-      this.setItem(STORAGE_KEYS.PRESENCES, SEED_PRESENCES);
-      this.setItem(STORAGE_KEYS.PAIEMENTS, SEED_PAIEMENTS);
-      this.setItem(STORAGE_KEYS.AUDIT_LOGS, SEED_AUDIT_LOGS);
-      this.setItem(STORAGE_KEYS.PARAMETRES, OFFICIAL_IDENTITY);
-      
-      const defaultCreds: Record<string, string> = {};
-      SEED_PROFILES.forEach((p) => {
-        defaultCreds[p.id] = hashPassword('Passer123!');
-      });
-      this.setItem(STORAGE_KEYS.CREDENTIALS, defaultCreds);
-      this.setItem(STORAGE_KEYS.VERSION, '2.2.0');
-    } else {
-      // Nettoyage et suppression irréversible des données d'exemple et démonstrations fictives
-      // sans supprimer aucun compte réel, ni compte officiel d'administration
-      const purgeFictifsKey = 'gogbo_v2_fictifs_cleaned_v3';
-      if (!localStorage.getItem(purgeFictifsKey)) {
-        const FICTIVE_PROFILE_IDS = new Set([
-          'usr-prof-math',
-          'usr-prof-francais',
-          'usr-prof-pct',
-          'usr-prof-sossou',
-          'usr-prof-mensah',
-          'usr-prof-bio',
-        ]);
-        const storedProfiles = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, []);
-        const cleanedProfiles = storedProfiles.filter((p) => !FICTIVE_PROFILE_IDS.has(p.id));
-        for (const off of SEED_PROFILES) {
-          if (!cleanedProfiles.some((p) => p.id === off.id || p.email.toLowerCase() === off.email.toLowerCase())) {
-            cleanedProfiles.push(off);
-          }
-        }
-        this.setItem(STORAGE_KEYS.PROFILES, cleanedProfiles);
-
-        const FICTIVE_ELEVES = new Set([
-          'elv-jean',
-          'elv-4a-01',
-          'elv-4a-02',
-          'elv-4a-03',
-          'elv-4a-04',
-          'elv-4a-05',
-          'elv-td-01',
-        ]);
-        const storedEleves = this.getItem<Eleve[]>(STORAGE_KEYS.ELEVES, []);
-        this.setItem(STORAGE_KEYS.ELEVES, storedEleves.filter((e) => !FICTIVE_ELEVES.has(e.id)));
-
-        const storedInscs = this.getItem<InscriptionEleve[]>(STORAGE_KEYS.INSCRIPTIONS, []);
-        this.setItem(STORAGE_KEYS.INSCRIPTIONS, storedInscs.filter((i) => !FICTIVE_ELEVES.has(i.eleve_id)));
-
-        const FICTIVE_AFFS = new Set([
-          'aff-sossou-math-6a',
-          'aff-mensah-francais-6a',
-          'aff-bio-pct-4a',
-          'aff-censeur-svt-4a',
-          'aff-dg-math-td',
-        ]);
-        const storedAffs = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, []);
-        this.setItem(STORAGE_KEYS.AFFECTATIONS, storedAffs.filter((a) => !FICTIVE_AFFS.has(a.id) && !FICTIVE_PROFILE_IDS.has(a.profile_id)));
-
-        const storedNotes = this.getItem<Note[]>(STORAGE_KEYS.NOTES, []);
-        this.setItem(STORAGE_KEYS.NOTES, storedNotes.filter((n) => !FICTIVE_ELEVES.has(n.eleve_id) && !FICTIVE_PROFILE_IDS.has(n.saisi_par)));
-
-        const storedPresences = this.getItem<EnregistrementPresence[]>(STORAGE_KEYS.PRESENCES, []);
-        this.setItem(STORAGE_KEYS.PRESENCES, storedPresences.filter((p) => !FICTIVE_ELEVES.has(p.eleve_id)));
-
-        const storedPaiements = this.getItem<PaiementContribution[]>(STORAGE_KEYS.PAIEMENTS, []);
-        this.setItem(STORAGE_KEYS.PAIEMENTS, storedPaiements.filter((p) => !FICTIVE_ELEVES.has(p.eleve_id)));
-
-        localStorage.setItem(purgeFictifsKey, 'true');
-      }
-
-      // Vérification et mise à niveau non-destructive pour les futures années scolaires
-      if (!localStorage.getItem(STORAGE_KEYS.ANNEES_SCOLAIRES)) {
+    try {
+      const initialized = this.rawGet(STORAGE_KEYS.VERSION);
+      if (!initialized) {
+        this.setItem(STORAGE_KEYS.PROFILES, SEED_PROFILES);
+        this.setItem(STORAGE_KEYS.CLASSES, OFFICIAL_CLASSES);
+        this.setItem(STORAGE_KEYS.MATIERES, OFFICIAL_MATIERES);
+        this.setItem(STORAGE_KEYS.ELEVES, SEED_ELEVES);
+        this.setItem(STORAGE_KEYS.INSCRIPTIONS, SEED_INSCRIPTIONS);
+        this.setItem(STORAGE_KEYS.PERIODES, OFFICIAL_PERIODES);
         this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, OFFICIAL_ANNEES_SCOLAIRES);
-      }
-      if (!localStorage.getItem(STORAGE_KEYS.PRESENCES)) {
+        this.setItem(STORAGE_KEYS.AFFECTATIONS, SEED_AFFECTATIONS);
+        this.setItem(STORAGE_KEYS.NOTES, SEED_NOTES);
         this.setItem(STORAGE_KEYS.PRESENCES, SEED_PRESENCES);
-      }
-      if (!localStorage.getItem(STORAGE_KEYS.PAIEMENTS)) {
         this.setItem(STORAGE_KEYS.PAIEMENTS, SEED_PAIEMENTS);
+        this.setItem(STORAGE_KEYS.AUDIT_LOGS, SEED_AUDIT_LOGS);
+        this.setItem(STORAGE_KEYS.PARAMETRES, OFFICIAL_IDENTITY);
+        
+        const defaultCreds: Record<string, string> = {};
+        SEED_PROFILES.forEach((p) => {
+          defaultCreds[p.id] = hashPassword('Passer123!');
+        });
+        this.setItem(STORAGE_KEYS.CREDENTIALS, defaultCreds);
+        this.rawSet(STORAGE_KEYS.VERSION, '2.2.0');
+      } else {
+        // Nettoyage et suppression irréversible des données d'exemple et démonstrations fictives
+        // sans supprimer aucun compte réel, ni compte officiel d'administration
+        const purgeFictifsKey = 'gogbo_v2_fictifs_cleaned_v3';
+        if (!this.rawGet(purgeFictifsKey)) {
+          const FICTIVE_PROFILE_IDS = new Set([
+            'usr-prof-math',
+            'usr-prof-francais',
+            'usr-prof-pct',
+            'usr-prof-sossou',
+            'usr-prof-mensah',
+            'usr-prof-bio',
+          ]);
+          const storedProfiles = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, []);
+          const cleanedProfiles = storedProfiles.filter((p) => !FICTIVE_PROFILE_IDS.has(p.id));
+          for (const off of SEED_PROFILES) {
+            if (!cleanedProfiles.some((p) => p.id === off.id || p.email.toLowerCase() === off.email.toLowerCase())) {
+              cleanedProfiles.push(off);
+            }
+          }
+          this.setItem(STORAGE_KEYS.PROFILES, cleanedProfiles);
+
+          const FICTIVE_ELEVES = new Set([
+            'elv-jean',
+            'elv-4a-01',
+            'elv-4a-02',
+            'elv-4a-03',
+            'elv-4a-04',
+            'elv-4a-05',
+            'elv-td-01',
+          ]);
+          const storedEleves = this.getItem<Eleve[]>(STORAGE_KEYS.ELEVES, []);
+          this.setItem(STORAGE_KEYS.ELEVES, storedEleves.filter((e) => !FICTIVE_ELEVES.has(e.id)));
+
+          const storedInscs = this.getItem<InscriptionEleve[]>(STORAGE_KEYS.INSCRIPTIONS, []);
+          this.setItem(STORAGE_KEYS.INSCRIPTIONS, storedInscs.filter((i) => !FICTIVE_ELEVES.has(i.eleve_id)));
+
+          const FICTIVE_AFFS = new Set([
+            'aff-sossou-math-6a',
+            'aff-mensah-francais-6a',
+            'aff-bio-pct-4a',
+            'aff-censeur-svt-4a',
+            'aff-dg-math-td',
+          ]);
+          const storedAffs = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, []);
+          this.setItem(STORAGE_KEYS.AFFECTATIONS, storedAffs.filter((a) => !FICTIVE_AFFS.has(a.id) && !FICTIVE_PROFILE_IDS.has(a.profile_id)));
+
+          const storedNotes = this.getItem<Note[]>(STORAGE_KEYS.NOTES, []);
+          this.setItem(STORAGE_KEYS.NOTES, storedNotes.filter((n) => !FICTIVE_ELEVES.has(n.eleve_id) && !FICTIVE_PROFILE_IDS.has(n.saisi_par)));
+
+          const storedPresences = this.getItem<EnregistrementPresence[]>(STORAGE_KEYS.PRESENCES, []);
+          this.setItem(STORAGE_KEYS.PRESENCES, storedPresences.filter((p) => !FICTIVE_ELEVES.has(p.eleve_id)));
+
+          const storedPaiements = this.getItem<PaiementContribution[]>(STORAGE_KEYS.PAIEMENTS, []);
+          this.setItem(STORAGE_KEYS.PAIEMENTS, storedPaiements.filter((p) => !FICTIVE_ELEVES.has(p.eleve_id)));
+
+          this.rawSet(purgeFictifsKey, 'true');
+        }
+
+        // Vérification et mise à niveau non-destructive pour les futures années scolaires
+        if (!this.rawGet(STORAGE_KEYS.ANNEES_SCOLAIRES)) {
+          this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, OFFICIAL_ANNEES_SCOLAIRES);
+        }
+        if (!this.rawGet(STORAGE_KEYS.PRESENCES)) {
+          this.setItem(STORAGE_KEYS.PRESENCES, SEED_PRESENCES);
+        }
+        if (!this.rawGet(STORAGE_KEYS.PAIEMENTS)) {
+          this.setItem(STORAGE_KEYS.PAIEMENTS, SEED_PAIEMENTS);
+        }
+
+        if (!this.rawGet(STORAGE_KEYS.INSCRIPTIONS)) {
+          const eleves = this.getEleves();
+          const initialInscriptions: InscriptionEleve[] = eleves.map((e) => ({
+            id: `insc-2026-${e.id}`,
+            eleve_id: e.id,
+            classe_id: e.classe_id,
+            annee_scolaire: '2026–2027',
+            statut: e.statut,
+            date_inscription: '2026-09-08',
+            redoublant: false,
+            actif: e.statut === 'ACTIF',
+            created_at: e.created_at || '2026-09-08T10:00:00Z',
+            updated_at: e.updated_at || '2026-09-08T10:00:00Z',
+          }));
+          this.setItem(STORAGE_KEYS.INSCRIPTIONS, initialInscriptions);
+        }
+        // Migration douce des affectations pour garantir annee_scolaire et double fonction
+        const currentAffs = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, SEED_AFFECTATIONS);
+        let affsNeedUpdate = false;
+        const patchedAffs = currentAffs.map((a) => {
+          if (!a.annee_scolaire) {
+            affsNeedUpdate = true;
+            return { ...a, annee_scolaire: '2026–2027' };
+          }
+          return a;
+        });
+
+        // Garantir les attributions officielles de double fonction (Censeur en SVT et DG en Maths)
+        SEED_AFFECTATIONS.forEach((seedAff) => {
+          if (!patchedAffs.some((a) => a.id === seedAff.id || (a.profile_id === seedAff.profile_id && a.classe_id === seedAff.classe_id && a.matiere_id === seedAff.matiere_id))) {
+            patchedAffs.push(seedAff);
+            affsNeedUpdate = true;
+          }
+        });
+
+        if (affsNeedUpdate) {
+          this.setItem(STORAGE_KEYS.AFFECTATIONS, patchedAffs);
+        }
+        // Migration douce des notes pour garantir annee_scolaire
+        const reloadedNotes = this.getItem<Note[]>(STORAGE_KEYS.NOTES, SEED_NOTES);
+        let notesNeedUpdate = false;
+        const periodesList = this.getPeriodes();
+        const patchedNotes = reloadedNotes.map((n) => {
+          if (!n.annee_scolaire) {
+            notesNeedUpdate = true;
+            const p = periodesList.find((per) => per.id === n.periode_id);
+            return { ...n, annee_scolaire: p?.annee_scolaire || '2026–2027' };
+          }
+          return n;
+        });
+        if (notesNeedUpdate) {
+          this.setItem(STORAGE_KEYS.NOTES, patchedNotes);
+        }
+        if (!this.rawGet(STORAGE_KEYS.CREDENTIALS)) {
+          const defaultCreds: Record<string, string> = {};
+          const profiles = this.getProfiles();
+          profiles.forEach((p) => {
+            defaultCreds[p.id] = hashPassword('Passer123!');
+          });
+          this.setItem(STORAGE_KEYS.CREDENTIALS, defaultCreds);
+        }
       }
 
-      if (!localStorage.getItem(STORAGE_KEYS.INSCRIPTIONS)) {
-        const eleves = this.getEleves();
-        const initialInscriptions: InscriptionEleve[] = eleves.map((e) => ({
+      // Initialisation non-destructive de l'Espace Parents (exécuté dans tous les cas si absent)
+      if (!this.rawGet(STORAGE_KEYS.PARENTS)) {
+        const initialParents: ParentProfile[] = [
+          {
+            id: 'par-houenou',
+            profile_id: 'usr-par-houenou',
+            nom: 'HOUENOU',
+            prenom: 'Paul',
+            telephone: '+229 97 45 67 89',
+            email: 'parent.houenou@gmail.com',
+            profession: 'Commerçant',
+            adresse: 'Adjohoun Centre',
+            statut: 'ACTIF',
+            created_at: '2026-09-08T08:00:00Z',
+            updated_at: '2026-09-08T08:00:00Z',
+          },
+          {
+            id: 'par-agossou',
+            profile_id: 'usr-par-agossou',
+            nom: 'AGOSSOU',
+            prenom: 'Benoît',
+            telephone: '+229 95 22 33 44',
+            email: 'parent.agossou@yahoo.fr',
+            profession: 'Artisan',
+            adresse: 'Gangban',
+            statut: 'ACTIF',
+            created_at: '2026-09-10T09:00:00Z',
+            updated_at: '2026-09-10T09:00:00Z',
+          },
+        ];
+        this.setItem(STORAGE_KEYS.PARENTS, initialParents);
+
+        const profiles = this.getProfiles();
+        initialParents.forEach((par) => {
+          if (!profiles.some((p) => p.id === par.profile_id)) {
+            profiles.push({
+              id: par.profile_id!,
+              email: par.email || `${par.telephone.replace(/[^0-9]/g, '')}@parent.ceggogbo.bj`,
+              nom: par.nom,
+              prenom: par.prenom,
+              role: 'PARENT',
+              is_enseignant: false,
+              telephone: par.telephone,
+              adresse: par.adresse,
+              statut: 'ACTIF',
+              created_at: par.created_at,
+              updated_at: par.updated_at,
+            });
+          }
+        });
+        this.setItem(STORAGE_KEYS.PROFILES, profiles);
+
+        const creds = this.getUserCredentials();
+        initialParents.forEach((par) => {
+          if (!creds[par.profile_id!]) {
+            creds[par.profile_id!] = hashPassword('Passer123!');
+          }
+        });
+        this.setItem(STORAGE_KEYS.CREDENTIALS, creds);
+      }
+
+      // Élèves de démonstration pour le parent Paul HOUENOU si la base est vide
+      let currentEleves = this.getEleves();
+      if (currentEleves.length === 0) {
+        const demoEleves: Eleve[] = [
+          {
+            id: 'elv-demo-darius',
+            matricule: 'MAT-2026-042',
+            nom: 'HOUENOU',
+            prenom: 'Darius',
+            sexe: 'M',
+            date_naissance: '2012-05-14',
+            lieu_naissance: 'Adjohoun',
+            classe_id: 'cls-6a',
+            langue_vivante_2: 'ESPAGNOL',
+            nom_parent: 'HOUENOU Paul',
+            contact_parent: '+229 97 45 67 89',
+            statut: 'ACTIF',
+            created_at: '2026-09-08T08:00:00Z',
+            updated_at: '2026-09-08T08:00:00Z',
+          },
+          {
+            id: 'elv-demo-mirabelle',
+            matricule: 'MAT-2026-118',
+            nom: 'HOUENOU',
+            prenom: 'Mirabelle',
+            sexe: 'F',
+            date_naissance: '2010-09-21',
+            lieu_naissance: 'Porto-Novo',
+            classe_id: 'cls-3b',
+            langue_vivante_2: 'ALLEMAND',
+            nom_parent: 'HOUENOU Paul',
+            contact_parent: '+229 97 45 67 89',
+            statut: 'ACTIF',
+            created_at: '2026-09-08T08:00:00Z',
+            updated_at: '2026-09-08T08:00:00Z',
+          },
+        ];
+        this.setItem(STORAGE_KEYS.ELEVES, demoEleves);
+        currentEleves = demoEleves;
+
+        const demoInscs: InscriptionEleve[] = demoEleves.map((e) => ({
           id: `insc-2026-${e.id}`,
           eleve_id: e.id,
           classe_id: e.classe_id,
           annee_scolaire: '2026–2027',
-          statut: e.statut,
+          statut: 'ACTIF',
           date_inscription: '2026-09-08',
           redoublant: false,
-          actif: e.statut === 'ACTIF',
-          created_at: e.created_at || '2026-09-08T10:00:00Z',
-          updated_at: e.updated_at || '2026-09-08T10:00:00Z',
+          actif: true,
+          created_at: '2026-09-08T08:00:00Z',
+          updated_at: '2026-09-08T08:00:00Z',
         }));
-        this.setItem(STORAGE_KEYS.INSCRIPTIONS, initialInscriptions);
+        this.setItem(STORAGE_KEYS.INSCRIPTIONS, demoInscs);
       }
-      // Migration douce des affectations pour garantir annee_scolaire
-      const currentAffs = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, SEED_AFFECTATIONS);
-      let affsNeedUpdate = false;
-      const patchedAffs = currentAffs.map((a) => {
-        if (!a.annee_scolaire) {
-          affsNeedUpdate = true;
-          return { ...a, annee_scolaire: '2026–2027' };
+
+      // Liaisons parent - élèves
+      if (!this.rawGet(STORAGE_KEYS.PARENT_ELEVES)) {
+        const demoLinks: ParentEleve[] = [];
+        if (currentEleves.length > 0) {
+          demoLinks.push({
+            id: 'pe-demo-01',
+            parent_id: 'par-houenou',
+            eleve_id: currentEleves[0].id,
+            lien_parental: 'PERE',
+            statut: 'ACTIF',
+            created_at: '2026-09-08T08:00:00Z',
+            updated_at: '2026-09-08T08:00:00Z',
+          });
+          if (currentEleves.length > 1) {
+            demoLinks.push({
+              id: 'pe-demo-02',
+              parent_id: 'par-houenou',
+              eleve_id: currentEleves[1].id,
+              lien_parental: 'PERE',
+              statut: 'ACTIF',
+              created_at: '2026-09-08T08:00:00Z',
+              updated_at: '2026-09-08T08:00:00Z',
+            });
+          }
         }
-        return a;
-      });
-      if (affsNeedUpdate) {
-        this.setItem(STORAGE_KEYS.AFFECTATIONS, patchedAffs);
+        this.setItem(STORAGE_KEYS.PARENT_ELEVES, demoLinks);
       }
-      // Migration douce des notes pour garantir annee_scolaire
-      const reloadedNotes = this.getItem<Note[]>(STORAGE_KEYS.NOTES, SEED_NOTES);
-      let notesNeedUpdate = false;
-      const periodesList = this.getPeriodes();
-      const patchedNotes = reloadedNotes.map((n) => {
-        if (!n.annee_scolaire) {
-          notesNeedUpdate = true;
-          const p = periodesList.find((per) => per.id === n.periode_id);
-          return { ...n, annee_scolaire: p?.annee_scolaire || '2026–2027' };
-        }
-        return n;
-      });
-      if (notesNeedUpdate) {
-        this.setItem(STORAGE_KEYS.NOTES, patchedNotes);
+
+      // Incidents disciplinaires
+      if (!this.rawGet(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES)) {
+        this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, []);
       }
-      if (!localStorage.getItem(STORAGE_KEYS.CREDENTIALS)) {
-        const defaultCreds: Record<string, string> = {};
-        const profiles = this.getProfiles();
-        profiles.forEach((p) => {
-          defaultCreds[p.id] = hashPassword('Passer123!');
-        });
-        this.setItem(STORAGE_KEYS.CREDENTIALS, defaultCreds);
+
+      // Notifications parents
+      if (!this.rawGet(STORAGE_KEYS.NOTIFICATIONS_PARENTS)) {
+        const demoNotifs: NotificationParent[] = [
+          {
+            id: 'notif-demo-01',
+            parent_id: 'par-houenou',
+            eleve_id: currentEleves[0]?.id || 'elv-demo-darius',
+            annee_scolaire: '2026–2027',
+            titre: 'Bienvenue sur l’Espace Parents GOGBO NOTES V2',
+            message: 'Bienvenue sur la plateforme officielle du CEG GOGBO. Vous pouvez suivre ici en temps réel les notes, absences, retards et bulletins scolaires de vos enfants.',
+            type: 'COMMUNIQUE',
+            date_envoi: '2026-09-15T08:00:00Z',
+            lu: false,
+            created_at: '2026-09-15T08:00:00Z',
+          },
+        ];
+        this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, demoNotifs);
       }
+
+      // Coefficients classes
+      if (!this.rawGet(STORAGE_KEYS.COEFFICIENTS_CLASSES)) {
+        this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
+      }
+    } catch (e) {
+      console.warn('StorageEngine init fallback notice:', e);
     }
   }
 
@@ -444,6 +835,16 @@ class StorageEngine {
   // --- PROFILES ---
   public getProfiles(): UserProfile[] {
     const list = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, SEED_PROFILES);
+    let hasMerged = false;
+    for (const seed of SEED_PROFILES) {
+      if (!list.some((p) => p.id === seed.id || (p.email && seed.email && p.email.toLowerCase() === seed.email.toLowerCase()))) {
+        list.push(seed);
+        hasMerged = true;
+      }
+    }
+    if (hasMerged) {
+      this.setItem(STORAGE_KEYS.PROFILES, list);
+    }
     return list.map((p) => {
       let matiere = p.matiere;
       if (!matiere && (p.is_enseignant || p.role === 'ENSEIGNANT')) {
@@ -748,6 +1149,145 @@ class StorageEngine {
     return this.getClasses().find((c) => c.id === id);
   }
 
+  public getNextClasseLetter(niveau: string): string {
+    const cleanNiveau = (niveau || '').trim().toLowerCase();
+    const classes = this.getClasses().filter((c) => {
+      const cNiv = (c.niveau || '').trim().toLowerCase();
+      const cNom = (c.nom || '').trim().toLowerCase();
+      return cNiv === cleanNiveau || cNom.startsWith(cleanNiveau) || (cleanNiveau.includes('6') && cNom.startsWith('6'));
+    });
+
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const usedLetters = new Set<string>();
+
+    classes.forEach((c) => {
+      const match = c.nom.trim().match(/([A-Z]+)$/i);
+      if (match) {
+        usedLetters.add(match[1].toUpperCase());
+      }
+    });
+
+    for (const letter of alphabet) {
+      if (!usedLetters.has(letter)) {
+        return letter;
+      }
+    }
+    for (const l1 of alphabet) {
+      for (const l2 of alphabet) {
+        const combo = `${l1}${l2}`;
+        if (!usedLetters.has(combo)) return combo;
+      }
+    }
+    return 'Z';
+  }
+
+  public createClasse(
+    data: {
+      niveau: string;
+      nom?: string;
+      serie?: string;
+      effectif_max?: number;
+      salle?: string;
+    },
+    operator: UserProfile
+  ): Classe {
+    if (!this.canAdminister(operator) && operator.role !== 'CENSEUR') {
+      throw new Error("Action non autorisée : Seul le Censeur ou l'Administration peut ajouter une nouvelle classe.");
+    }
+
+    const classes = this.getClasses();
+    const niveau = (data.niveau || '6ème').trim();
+    const nextLetter = this.getNextClasseLetter(niveau);
+    
+    let nom = (data.nom || '').trim();
+    if (!nom) {
+      nom = `${niveau} ${nextLetter}`;
+    }
+
+    if (classes.some((c) => c.nom.toLowerCase() === nom.toLowerCase())) {
+      throw new Error(`Une classe portant le nom "${nom}" existe déjà.`);
+    }
+
+    const cleanNivSlug = niveau.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanLetSlug = nextLetter.toLowerCase();
+    const id = `cls-${cleanNivSlug}-${cleanLetSlug}-${Date.now().toString(36).slice(-4)}`;
+
+    const isFirstCycle = ['6ème', '5ème', '4ème', '3ème', '6e', '5e', '4e', '3e'].includes(niveau);
+    const defaultSerie = data.serie || (isFirstCycle ? 'Générale' : 'A');
+
+    const newClasse: Classe = {
+      id,
+      nom,
+      niveau: niveau as Classe['niveau'],
+      serie: defaultSerie as Classe['serie'],
+      effectif_max: data.effectif_max || 100,
+      salle: data.salle || `Salle ${nom}`,
+    };
+
+    const updatedClasses = [...classes, newClasse];
+    this.setItem(STORAGE_KEYS.CLASSES, updatedClasses);
+
+    // Initialisation automatique des coefficients de matières pour la nouvelle classe
+    try {
+      const allCoefs = this.getCoefficientsClasses();
+      const templateClasse = classes.find((c) => c.niveau.toLowerCase() === niveau.toLowerCase());
+      if (templateClasse) {
+        const templateCoefs = allCoefs.filter((cc) => cc.classe_id === templateClasse.id);
+        const clonedCoefs = templateCoefs.map((tc) => ({
+          ...tc,
+          id: `coef-${newClasse.id}-${tc.matiere_id}`,
+          classe_id: newClasse.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, [...allCoefs, ...clonedCoefs]);
+      }
+    } catch {
+      // Ignorer si échec d'affectation automatique de coefficients
+    }
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'CREATION_CLASSE',
+      table_cible: 'classes',
+      record_id: newClasse.id,
+      details: `Création de la nouvelle classe ${newClasse.nom} (${newClasse.niveau} - ${newClasse.serie}) par le Censeur`,
+    });
+
+    return newClasse;
+  }
+
+  public deleteClasse(id: string, operator: UserProfile): boolean {
+    if (!this.canAdminister(operator) && operator.role !== 'CENSEUR') {
+      throw new Error("Action non autorisée : Seul le Censeur ou l'Administration peut supprimer une classe.");
+    }
+    const classes = this.getClasses();
+    const target = classes.find((c) => c.id === id);
+    if (!target) throw new Error("Classe introuvable.");
+
+    const eleves = this.getEleves().filter((e) => e.classe_id === id);
+    if (eleves.length > 0) {
+      throw new Error(`Suppression impossible : la classe "${target.nom}" compte ${eleves.length} apprenant(s). Réaffectez d'abord ces élèves.`);
+    }
+
+    const updated = classes.filter((c) => c.id !== id);
+    this.setItem(STORAGE_KEYS.CLASSES, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_CLASSE',
+      table_cible: 'classes',
+      record_id: id,
+      details: `Suppression de la classe ${target.nom}`,
+    });
+
+    return true;
+  }
+
   // --- MATIERES ---
   public getMatieres(): Matiere[] {
     return this.getItem<Matiere[]>(STORAGE_KEYS.MATIERES, OFFICIAL_MATIERES);
@@ -812,6 +1352,106 @@ class StorageEngine {
 
   public getMatiereByCode(code: string): Matiere | undefined {
     return this.getMatieres().find((m) => m.code.toUpperCase() === code.toUpperCase());
+  }
+
+  // --- COEFFICIENTS PAR CLASSE / NIVEAU (EXIGENCE 5.E) ---
+  public getCoefficientsClasses(anneeScolaire?: string): import('../types').CoefficientClasse[] {
+    const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
+    const all = this.getItem<import('../types').CoefficientClasse[]>(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
+    return all.filter((c) => !c.annee_scolaire || c.annee_scolaire === annee);
+  }
+
+  public getCoefficientMatiere(matiereId: string, classeId?: string, anneeScolaire?: string): number {
+    const mat = this.getMatiereById(matiereId);
+    const defaultCoef = mat ? mat.coefficient : 1;
+    if (!classeId) return defaultCoef;
+
+    const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
+    const all = this.getCoefficientsClasses(annee);
+    
+    // 1. Chercher un coefficient spécifique pour cette classe exacte (ex: cls-6a)
+    const specific = all.find((c) => c.classe_id === classeId && c.matiere_id === matiereId);
+    if (specific && specific.coefficient > 0) {
+      return specific.coefficient;
+    }
+
+    // 2. Chercher par niveau (ex: si configuré pour 6ème)
+    const cls = this.getClasseById(classeId);
+    if (cls) {
+      const byNiveau = all.find((c) => c.classe_id === cls.niveau && c.matiere_id === matiereId);
+      if (byNiveau && byNiveau.coefficient > 0) {
+        return byNiveau.coefficient;
+      }
+    }
+
+    return defaultCoef;
+  }
+
+  public setCoefficientClasse(
+    classeId: string,
+    matiereId: string,
+    coefficient: number,
+    anneeOrOperator: string | UserProfile,
+    operatorOrAnnee?: UserProfile | string
+  ): import('../types').CoefficientClasse {
+    let annee: string;
+    let operator: UserProfile;
+
+    if (typeof anneeOrOperator === 'string') {
+      annee = anneeOrOperator;
+      operator = operatorOrAnnee as UserProfile;
+    } else {
+      operator = anneeOrOperator;
+      annee = typeof operatorOrAnnee === 'string' ? operatorOrAnnee : this.getActiveAnneeScolaire().libelle;
+    }
+
+    if (!operator || (!this.canAdminister(operator) && operator.role !== 'ENSEIGNANT')) {
+      throw new Error("Action non autorisée : Seul le Censeur ou l'enseignant titulaire peut ajuster ce coefficient.");
+    }
+
+    const all = this.getItem<import('../types').CoefficientClasse[]>(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
+    const targetAnnee = annee || this.getActiveAnneeScolaire().libelle;
+    const idx = all.findIndex((c) => c.classe_id === classeId && c.matiere_id === matiereId && c.annee_scolaire === targetAnnee);
+
+    const updatedItem: import('../types').CoefficientClasse = {
+      id: idx !== -1 ? all[idx].id : `coef-${classeId}-${matiereId}-${Date.now().toString(36)}`,
+      annee_scolaire: targetAnnee,
+      classe_id: classeId,
+      matiere_id: matiereId,
+      coefficient,
+      updated_at: new Date().toISOString()
+    };
+
+    if (idx !== -1) {
+      all[idx] = updatedItem;
+    } else {
+      all.push(updatedItem);
+    }
+
+    this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, all);
+
+    const cls = this.getClasseById(classeId);
+    const mat = this.getMatiereById(matiereId);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'MODIFICATION_COEFFICIENT_CLASSE',
+      table_cible: 'coefficients_classes',
+      record_id: updatedItem.id,
+      details: `Ajustement coefficient de ${mat?.nom || matiereId} pour ${cls?.nom || classeId} : ${coefficient} (${targetAnnee})`,
+    });
+
+    return updatedItem;
+  }
+
+  public getMatieresByClasse(classeId?: string, anneeScolaire?: string): Matiere[] {
+    const list = this.getMatieres();
+    if (!classeId) return list;
+    return list.map((m) => {
+      const coef = this.getCoefficientMatiere(m.id, classeId, anneeScolaire);
+      return { ...m, coefficient: coef };
+    });
   }
 
   // --- ELEVES & INSCRIPTIONS PLURIANNUELLES ---
@@ -946,13 +1586,22 @@ class StorageEngine {
       }));
   }
 
+  public canAdministerEleves(operator: UserProfile, classeId?: string, anneeScolaire?: string): boolean {
+    if (this.canAdminister(operator)) return true;
+    if (operator.role === 'ENSEIGNANT' && classeId) {
+      const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
+      return this.isProfesseurPrincipalOfClasse(operator.id, classeId, annee);
+    }
+    return false;
+  }
+
   public inscrireEleve(
     data: Omit<InscriptionEleve, 'id' | 'created_at' | 'updated_at'>,
     operator: UserProfile,
     logAudit = true
   ): InscriptionEleve {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit d'inscrire des élèves.");
+    if (!this.canAdministerEleves(operator, data.classe_id, data.annee_scolaire)) {
+      throw new Error("Action non autorisée : Seul le Censeur, la Direction ou le Professeur Principal de cette classe a le droit d'inscrire des élèves.");
     }
 
     const inscriptions = this.getInscriptions();
@@ -1061,9 +1710,10 @@ class StorageEngine {
   }
 
   public createEleve(data: Omit<Eleve, 'id' | 'created_at' | 'updated_at'>, operator: UserProfile): Eleve {
-    // Vérification stricte des permissions (Point 10 & 11)
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit d'inscrire des élèves.");
+    const activeAnnee = this.getActiveAnneeScolaire().libelle;
+    // Vérification stricte des permissions : Censeur, DG, ou Professeur Principal de cette classe pour l'année active
+    if (!this.canAdministerEleves(operator, data.classe_id, activeAnnee)) {
+      throw new Error("Action non autorisée : Seul le Censeur, la Direction Générale ou le Professeur Principal de cette classe a le droit d'inscrire des élèves.");
     }
 
     const eleves = this.getEleves();
@@ -1094,7 +1744,6 @@ class StorageEngine {
     this.setItem(STORAGE_KEYS.ELEVES, eleves);
 
     // Inscription automatique pour l'année académique active
-    const activeAnnee = this.getActiveAnneeScolaire().libelle;
     try {
       this.inscrireEleve(
         {
@@ -1113,14 +1762,19 @@ class StorageEngine {
       console.warn("Auto-inscription eleve:", e);
     }
 
+    const isPP = operator.role === 'ENSEIGNANT';
+    const cls = this.getClasseById(data.classe_id);
+
     this.addAuditLog({
       user_id: operator.id,
       user_nom: `${operator.nom} ${operator.prenom}`,
       user_role: operator.role,
-      action: 'CREATION_ELEVE',
+      action: isPP ? 'INSCRIPTION_APPRENANT_PP' : 'CREATION_ELEVE',
       table_cible: 'eleves',
       record_id: id,
-      details: `Inscription élève: ${newEleve.nom} ${newEleve.prenom} (Matricule: ${newEleve.matricule})`,
+      details: isPP 
+        ? `Inscription de l'apprenant par le Professeur Principal : ${newEleve.nom} ${newEleve.prenom} (${newEleve.matricule}) en classe de ${cls?.nom || data.classe_id}`
+        : `Inscription élève: ${newEleve.nom} ${newEleve.prenom} (Matricule: ${newEleve.matricule})`,
     });
 
     // Synchronisation en arrière-plan avec Supabase si connecté
@@ -1136,6 +1790,7 @@ class StorageEngine {
               prenom: newEleve.prenom,
               sexe: newEleve.sexe,
               date_naissance: newEleve.date_naissance || null,
+              lieu_naissance: newEleve.lieu_naissance || null,
               classe_id: newEleve.classe_id,
               langue_vivante_2: newEleve.langue_vivante_2,
               nom_parent: newEleve.nom_parent || null,
@@ -1154,14 +1809,27 @@ class StorageEngine {
   }
 
   public updateEleve(id: string, updates: Partial<Eleve>, operator: UserProfile): Eleve {
-    // Vérification stricte des permissions (Point 10 & 11)
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de modifier les fiches élèves.");
-    }
-
     const eleves = this.getEleves();
     const idx = eleves.findIndex((e) => e.id === id);
     if (idx === -1) throw new Error('Élève non trouvé');
+
+    const currentEleve = eleves[idx];
+    const isPP = operator.role === 'ENSEIGNANT';
+
+    // Vérification stricte des permissions : Censeur, DG, ou Professeur Principal de la classe
+    if (isPP) {
+      const activeAnnee = this.getActiveAnneeScolaire().libelle;
+      const isPPOfEleveClass = this.isProfesseurPrincipalOfClasse(operator.id, currentEleve.classe_id, activeAnnee);
+      if (!isPPOfEleveClass) {
+        throw new Error("Action non autorisée : Vous n'êtes pas Professeur Principal de la classe de cet apprenant.");
+      }
+      // Règle 8 : Le PP ne peut pas muter l'élève vers une autre classe
+      if (updates.classe_id && updates.classe_id !== currentEleve.classe_id) {
+        throw new Error("Action non autorisée : Un Professeur Principal ne peut pas muter un apprenant vers une autre classe.");
+      }
+    } else if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur, la Direction Générale ou le Professeur Principal de la classe a le droit de modifier les fiches élèves.");
+    }
 
     // Vérifier unicité du matricule si modifié
     if (updates.matricule && updates.matricule.trim().toUpperCase() !== eleves[idx].matricule) {
@@ -1209,10 +1877,12 @@ class StorageEngine {
       user_id: operator.id,
       user_nom: `${operator.nom} ${operator.prenom}`,
       user_role: operator.role,
-      action: 'MODIFICATION_ELEVE',
+      action: isPP ? 'MODIFICATION_APPRENANT_PP' : 'MODIFICATION_ELEVE',
       table_cible: 'eleves',
       record_id: id,
-      details: `Mise à jour élève: ${updated.nom} ${updated.prenom} (${updated.matricule})`,
+      details: isPP
+        ? `Modification administrative de l'apprenant par le Professeur Principal : ${updated.nom} ${updated.prenom} (${updated.matricule})`
+        : `Mise à jour élève: ${updated.nom} ${updated.prenom} (${updated.matricule})`,
     });
 
     // Synchronisation avec Supabase si connecté
@@ -1227,6 +1897,7 @@ class StorageEngine {
               prenom: updated.prenom,
               sexe: updated.sexe,
               date_naissance: updated.date_naissance || null,
+              lieu_naissance: updated.lieu_naissance || null,
               classe_id: updated.classe_id,
               langue_vivante_2: updated.langue_vivante_2,
               nom_parent: updated.nom_parent || null,
@@ -1291,11 +1962,20 @@ class StorageEngine {
 
   // --- PERIODES ---
   public getPeriodes(): Periode[] {
-    const list = this.getItem<Periode[]>(STORAGE_KEYS.PERIODES, OFFICIAL_PERIODES);
+    const raw = this.getItem<Periode[]>(STORAGE_KEYS.PERIODES, OFFICIAL_PERIODES);
+    let list: Periode[] = Array.isArray(raw)
+      ? raw
+          .filter((p): p is Periode => !!p && typeof p === 'object' && !!p.id)
+          .map((p) => ({
+            ...p,
+            is_locked: p.is_locked ?? false,
+          }))
+      : [...OFFICIAL_PERIODES];
+
     let changed = false;
     for (const officialP of OFFICIAL_PERIODES) {
-      if (!list.some((p) => p.id === officialP.id)) {
-        list.push(officialP);
+      if (!list.some((p) => p && p.id === officialP.id)) {
+        list.push({ ...officialP, is_locked: officialP.is_locked ?? false });
         changed = true;
       }
     }
@@ -1307,14 +1987,23 @@ class StorageEngine {
 
   public getPeriodesByAnnee(anneeScolaire?: string): Periode[] {
     const list = this.getPeriodes();
-    if (!anneeScolaire) return list;
-    const filtered = list.filter((p) => (p.annee_scolaire || '2026–2027') === anneeScolaire);
-    return filtered.length > 0 ? filtered : list;
+    if (!anneeScolaire) return list.length > 0 ? list : OFFICIAL_PERIODES;
+    const cleanAnnee = anneeScolaire.replace(/\u2013/g, '-').trim();
+    const filtered = list.filter((p) => {
+      if (!p) return false;
+      const pAnnee = (p.annee_scolaire || '2026–2027').replace(/\u2013/g, '-').trim();
+      return pAnnee === cleanAnnee;
+    });
+    return filtered.length > 0 ? filtered : (list.length > 0 ? list : OFFICIAL_PERIODES);
   }
 
   public getActivePeriode(): Periode {
     const periodes = this.getPeriodes();
-    return periodes.find((p) => p.is_active) || periodes[0];
+    const found = periodes.find((p) => p && p.is_active) || periodes[0] || OFFICIAL_PERIODES[0];
+    return {
+      ...found,
+      is_locked: found?.is_locked ?? false,
+    };
   }
 
   public setActivePeriode(periodeId: string, operator: UserProfile): Periode {
@@ -1529,8 +2218,13 @@ class StorageEngine {
     if (!cleanAttempt) return false;
 
     const profiles = this.getProfiles();
+    const cleanId = userIdOrEmail.trim().toLowerCase();
+    const cleanDigits = cleanId.replace(/[^0-9]/g, '');
+
     const user = profiles.find(
-      (p) => p.id === userIdOrEmail || p.email.toLowerCase() === userIdOrEmail.trim().toLowerCase()
+      (p) => p.id === userIdOrEmail ||
+             p.email.toLowerCase() === cleanId ||
+             (cleanDigits.length >= 8 && p.telephone && p.telephone.replace(/[^0-9]/g, '').endsWith(cleanDigits))
     );
     if (!user) return false;
 
@@ -1699,22 +2393,34 @@ class StorageEngine {
   }
 
   // --- GESTION DE LA SESSION ACTIVE DANS LE STOCKAGE ---
+  public getCurrentUserId(): string | null {
+    return this.rawGet('gogbo_v2_current_user_id');
+  }
+
+  public setCurrentUserId(id: string | null): void {
+    if (!id) {
+      this.rawRemove('gogbo_v2_current_user_id');
+    } else {
+      this.rawSet('gogbo_v2_current_user_id', id);
+    }
+  }
+
+  public clearCurrentUser(): void {
+    this.rawRemove('gogbo_v2_current_user_id');
+  }
+
   public getActiveUser(): UserProfile | null {
-    const id = localStorage.getItem('gogbo_v2_current_user_id');
+    const id = this.getCurrentUserId();
     if (!id) return null;
     return this.getProfileById(id) || null;
   }
 
   public setActiveUser(user: UserProfile | null): void {
-    if (!user) {
-      localStorage.removeItem('gogbo_v2_current_user_id');
-    } else {
-      localStorage.setItem('gogbo_v2_current_user_id', user.id);
-    }
+    this.setCurrentUserId(user ? user.id : null);
   }
 
   public logout(): void {
-    localStorage.removeItem('gogbo_v2_current_user_id');
+    this.clearCurrentUser();
   }
 
   public getNotesByAffectation(affectationId: string): Note[] {
@@ -1738,6 +2444,16 @@ class StorageEngine {
   // --- ATTRIBUTIONS DE CLASSE (AFFECTATIONS PÉDAGOGIQUES PLURIANNUELLES) ---
   public getAffectations(anneeScolaire?: string): AffectationPedagogique[] {
     const list = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, SEED_AFFECTATIONS);
+    let hasMerged = false;
+    for (const seed of SEED_AFFECTATIONS) {
+      if (!list.some((a) => a.id === seed.id)) {
+        list.push(seed);
+        hasMerged = true;
+      }
+    }
+    if (hasMerged) {
+      this.setItem(STORAGE_KEYS.AFFECTATIONS, list);
+    }
     const normalized = list.map((a) => a.annee_scolaire ? a : { ...a, annee_scolaire: '2026–2027' });
     if (anneeScolaire) {
       return normalized.filter((a) => a.annee_scolaire === anneeScolaire);
@@ -2407,9 +3123,1106 @@ class StorageEngine {
     return true;
   }
 
+  // --- MODULE CONFIGURATION DES CONTRIBUTIONS SCOLAIRES (COMPTABLE) ---
+  public getContributions(anneeScolaire?: string): ContributionConfig[] {
+    const list = this.getItem<ContributionConfig[]>(STORAGE_KEYS.CONTRIBUTIONS, SEED_CONTRIBUTIONS);
+    if (!anneeScolaire) return list;
+    return list.filter((c) => c.annee_scolaire === anneeScolaire);
+  }
+
+  public saveContribution(
+    data: Omit<ContributionConfig, 'id' | 'created_at' | 'updated_at'>,
+    operator: UserProfile
+  ): ContributionConfig {
+    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut créer des rubriques de contributions.");
+    }
+    const list = this.getContributions();
+    const id = `cnt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    const newEntry: ContributionConfig = {
+      ...data,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    list.push(newEntry);
+    this.setItem(STORAGE_KEYS.CONTRIBUTIONS, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'CREATION_CONTRIBUTION',
+      table_cible: 'contributions',
+      record_id: id,
+      details: `Création contribution ${data.libelle} (${data.montant_prevu} FCFA) - Année ${data.annee_scolaire}`,
+    });
+
+    return newEntry;
+  }
+
+  public updateContribution(
+    id: string,
+    data: Partial<ContributionConfig>,
+    operator: UserProfile
+  ): ContributionConfig {
+    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+      throw new Error("Action non autorisée.");
+    }
+    const list = this.getContributions();
+    const idx = list.findIndex((c) => c.id === id);
+    if (idx === -1) throw new Error("Contribution introuvable");
+    list[idx] = {
+      ...list[idx],
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+    this.setItem(STORAGE_KEYS.CONTRIBUTIONS, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'MODIFICATION_CONTRIBUTION',
+      table_cible: 'contributions',
+      record_id: id,
+      details: `Mise à jour contribution ${list[idx].libelle}`,
+    });
+
+    return list[idx];
+  }
+
+  public deleteContribution(id: string, operator: UserProfile): boolean {
+    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+      throw new Error("Action non autorisée.");
+    }
+    const list = this.getContributions();
+    const updated = list.filter((c) => c.id !== id);
+    this.setItem(STORAGE_KEYS.CONTRIBUTIONS, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_CONTRIBUTION',
+      table_cible: 'contributions',
+      record_id: id,
+      details: `Suppression contribution ${id}`,
+    });
+
+    return true;
+  }
+
+  // --- MODULE GESTION BUDGETS ET DÉPENSES RÉELLES (COMPTABLE) ---
+  public getDepenses(anneeScolaire?: string): DepenseBudgetaire[] {
+    const list = this.getItem<DepenseBudgetaire[]>(STORAGE_KEYS.DEPENSES, SEED_DEPENSES);
+    if (!anneeScolaire) return list;
+    return list.filter((d) => d.annee_scolaire === anneeScolaire);
+  }
+
+  public saveDepense(
+    data: Omit<DepenseBudgetaire, 'id' | 'created_at' | 'updated_at'>,
+    operator: UserProfile
+  ): DepenseBudgetaire {
+    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut enregistrer une dépense.");
+    }
+    const list = this.getDepenses();
+    const id = `dep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    const newEntry: DepenseBudgetaire = {
+      ...data,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    list.unshift(newEntry);
+    this.setItem(STORAGE_KEYS.DEPENSES, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'ENREGISTREMENT_DEPENSE',
+      table_cible: 'depenses',
+      record_id: id,
+      details: `Dépense ${data.libelle} (${data.montant_depense} FCFA) - Bénéficiaire: ${data.beneficiaire}`,
+    });
+
+    return newEntry;
+  }
+
+  public deleteDepense(id: string, operator: UserProfile): boolean {
+    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+      throw new Error("Action non autorisée.");
+    }
+    const list = this.getDepenses();
+    const updated = list.filter((d) => d.id !== id);
+    this.setItem(STORAGE_KEYS.DEPENSES, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_DEPENSE',
+      table_cible: 'depenses',
+      record_id: id,
+      details: `Suppression dépense ${id}`,
+    });
+
+    return true;
+  }
+
   // ====================================================================
-  // MODULE : PRÉSENCE JOURNALIÈRE DES ENSEIGNANTS (RÉSERVÉ AU CENSEUR)
+  // MODULE : NOTE DE CONDUITE (Saisie exclusive par le Professeur Principal)
   // ====================================================================
+  public getNotesConduite(anneeScolaire?: string): NoteConduite[] {
+    const list = this.getItem<NoteConduite[]>(STORAGE_KEYS.NOTES_CONDUITE, SEED_NOTES_CONDUITE);
+    if (!anneeScolaire) return list;
+    return list.filter((n) => n.annee_scolaire === anneeScolaire);
+  }
+
+  public getNoteConduiteByEleve(
+    eleveId: string,
+    periodeId: string,
+    anneeScolaire?: string
+  ): NoteConduite | undefined {
+    return this.getNotesConduite(anneeScolaire).find(
+      (n) => n.eleve_id === eleveId && n.periode_id === periodeId
+    );
+  }
+
+  public getNoteConduiteEleve(
+    eleveId: string,
+    periodeId: string,
+    anneeScolaire?: string
+  ): NoteConduite | undefined {
+    return this.getNoteConduiteByEleve(eleveId, periodeId, anneeScolaire);
+  }
+
+  public getNotesConduiteByClasse(
+    classeId: string,
+    periodeId: string,
+    anneeScolaire?: string
+  ): NoteConduite[] {
+    return this.getNotesConduite(anneeScolaire).filter(
+      (n) => n.classe_id === classeId && n.periode_id === periodeId
+    );
+  }
+
+  public saveNoteConduite(
+    data: {
+      eleve_id: string;
+      classe_id: string;
+      periode_id: string;
+      annee_scolaire: string;
+      note: number;
+      appreciation?: string;
+      motif_modification?: string;
+    },
+    operator: UserProfile
+  ): NoteConduite {
+    // Vérification des droits : L'opérateur DOIT être le PP ACTIF de la classe ou Censeur/DG/Concepteur
+    const isPP = this.getActiveProfesseurPrincipalByEnseignant(operator.id, data.annee_scolaire)?.classe_id === data.classe_id;
+    const canManageConduite = isPP || this.canAdminister(operator);
+    if (!canManageConduite) {
+      throw new Error("Action non autorisée : Seul le Professeur Principal de la classe (ou l'Administration) peut saisir ou modifier la note de conduite.");
+    }
+
+    if (data.note < 0 || data.note > 20) {
+      throw new Error("La note de conduite doit être comprise entre 0 et 20.");
+    }
+
+    const list = this.getNotesConduite();
+    const existingIndex = list.findIndex(
+      (n) =>
+        n.eleve_id === data.eleve_id &&
+        n.periode_id === data.periode_id &&
+        n.annee_scolaire === data.annee_scolaire
+    );
+
+    const now = new Date().toISOString();
+    const apprec = data.appreciation || (
+      data.note >= 18 ? 'Excellente conduite' :
+      data.note >= 16 ? 'Très bonne conduite' :
+      data.note >= 14 ? 'Bonne conduite' :
+      data.note >= 12 ? 'Conduite assez bien' :
+      data.note >= 10 ? 'Conduite passable' :
+      data.note >= 8 ? 'Conduite insuffisante' :
+      data.note >= 6 ? 'Mauvaise conduite' : 'Conduite très faible'
+    );
+
+    let resultEntry: NoteConduite;
+
+    if (existingIndex >= 0) {
+      const existing = list[existingIndex];
+      const historique = existing.historique || [];
+      historique.push({
+        ancienne_note: existing.note,
+        nouvelle_note: data.note,
+        modifie_par_id: operator.id,
+        modifie_par_nom: `${operator.nom} ${operator.prenom}`,
+        date: now,
+        motif: data.motif_modification,
+      });
+
+      resultEntry = {
+        ...existing,
+        note: data.note,
+        appreciation: apprec,
+        saisi_par_id: operator.id,
+        saisi_par_nom: `${operator.nom} ${operator.prenom}`,
+        date_saisie: now,
+        historique,
+        updated_at: now,
+      };
+      list[existingIndex] = resultEntry;
+    } else {
+      const id = `cnd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      resultEntry = {
+        id,
+        annee_scolaire: data.annee_scolaire,
+        periode_id: data.periode_id,
+        classe_id: data.classe_id,
+        eleve_id: data.eleve_id,
+        note: data.note,
+        appreciation: apprec,
+        saisi_par_id: operator.id,
+        saisi_par_nom: `${operator.nom} ${operator.prenom}`,
+        date_saisie: now,
+        historique: [],
+        created_at: now,
+        updated_at: now,
+      };
+      list.push(resultEntry);
+    }
+
+    this.setItem(STORAGE_KEYS.NOTES_CONDUITE, list);
+
+    const el = this.getEleveById(data.eleve_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SAISIE_NOTE_CONDUITE',
+      table_cible: 'notes_conduite',
+      record_id: resultEntry.id,
+      details: `Note de conduite ${data.note}/20 pour l'élève ${el?.nom} ${el?.prenom} par ${operator.nom} ${operator.prenom} (PP)`,
+    });
+
+    return resultEntry;
+  }
+
+  // ====================================================================
+  // MODULE : PUNITIONS SCOLAIRES QUOTIDIENNES (Ouvert à TOUT le personnel)
+  // ====================================================================
+  public getPunitions(anneeScolaire?: string): PunitionScolaire[] {
+    const list = this.getItem<PunitionScolaire[]>(STORAGE_KEYS.PUNITIONS, SEED_PUNITIONS);
+    const normalized = list.map((p) => ({
+      ...p,
+      statut: (p.statut || 'ACTIVE') as StatutPunition,
+    }));
+    if (!anneeScolaire) return normalized;
+    return normalized.filter((p) => p.annee_scolaire === anneeScolaire);
+  }
+
+  public getPunitionsByEleve(eleveId: string, anneeScolaire?: string): PunitionScolaire[] {
+    return this.getPunitions(anneeScolaire).filter((p) => p.eleve_id === eleveId);
+  }
+
+  public getPunitionsByClasse(classeId: string, anneeScolaire?: string): PunitionScolaire[] {
+    return this.getPunitions(anneeScolaire).filter((p) => p.classe_id === classeId);
+  }
+
+  public savePunition(
+    data: Omit<PunitionScolaire, 'id' | 'created_at' | 'updated_at' | 'auteur_id' | 'auteur_nom' | 'auteur_role' | 'statut'>,
+    operator: UserProfile
+  ): PunitionScolaire {
+    const canPunish = operator.role === 'ENSEIGNANT' || operator.is_enseignant || this.canAdminister(operator) || operator.role === 'SURVEILLANT_GENERAL';
+    if (!canPunish) {
+      throw new Error("Action non autorisée : Seul le personnel enseignant et administratif peut consigner une punition.");
+    }
+
+    const interdictionsCorps = ['coup', 'gifle', 'chicotte', 'regle', 'injure', 'fouette', 'frapper'];
+    const pLower = `${data.punition_appliquee} ${data.observation || ''}`.toLowerCase();
+    for (const mot of interdictionsCorps) {
+      if (pLower.includes(mot)) {
+        throw new Error("PUNITION INTERDITE : Tout châtiment corporel, violence physique ou injure est formellement banni de l'établissement.");
+      }
+    }
+
+    if (pLower.includes('note') || pLower.includes('zéro') || pLower.includes('zero')) {
+      throw new Error("PUNITION INTERDITE : Il est strictement interdit d'utiliser une note académique comme punition disciplinaire.");
+    }
+
+    const list = this.getItem<PunitionScolaire[]>(STORAGE_KEYS.PUNITIONS, SEED_PUNITIONS);
+    const id = `pun-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const newPunition: PunitionScolaire = {
+      ...data,
+      id,
+      auteur_id: operator.id,
+      auteur_nom: `${operator.nom} ${operator.prenom}`,
+      auteur_role: operator.role,
+      statut: 'ACTIVE',
+      created_at: now,
+      updated_at: now,
+    };
+
+    list.unshift(newPunition);
+    this.setItem(STORAGE_KEYS.PUNITIONS, list);
+
+    const el = this.getEleveById(data.eleve_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'ENREGISTREMENT_PUNITION',
+      table_cible: 'punitions',
+      record_id: id,
+      details: `Punition appliquée à ${el?.nom} ${el?.prenom} pour "${data.faute_motif}" : ${data.punition_appliquee} par ${operator.nom} ${operator.prenom} (${operator.role})`,
+    });
+
+    return newPunition;
+  }
+
+  public annulerPunition(id: string, operator: UserProfile, motif?: string): PunitionScolaire {
+    const list = this.getItem<PunitionScolaire[]>(STORAGE_KEYS.PUNITIONS, SEED_PUNITIONS);
+    const targetIdx = list.findIndex((p) => p.id === id);
+    if (targetIdx === -1) throw new Error("Punition non trouvée.");
+
+    const target = list[targetIdx];
+
+    // Règles d'habilitation :
+    // - L'auteur qui a puni l'apprenant peut annuler sa propre punition.
+    // - Le Surveillant Général peut également annuler les punitions selon ses droits.
+    // - Concepteur autorisé pour maintenance.
+    // - Tout autre enseignant ou utilisateur non autorisé ne peut pas annuler.
+    const isAuthor = target.auteur_id === operator.id;
+    const isSurveillantGen = operator.role === 'SURVEILLANT_GENERAL';
+    const isConcepteur = operator.role === 'CONCEPTEUR';
+
+    if (!isAuthor && !isSurveillantGen && !isConcepteur) {
+      throw new Error("Action non autorisée : Seul l'auteur de la punition ou le Surveillant Général peut annuler cette punition.");
+    }
+
+    if (target.statut === 'ANNULEE') {
+      throw new Error("Cette punition a déjà été annulée.");
+    }
+
+    const now = new Date();
+    const datePart = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timePart = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const annuleLeFormatted = `${datePart} ${timePart}`;
+
+    const annuleParNom = isSurveillantGen && !isAuthor
+      ? 'Surveillant Général'
+      : `${operator.nom} ${operator.prenom}`;
+
+    const motifAnnulation = motif?.trim() || "Annulée par décision de l'auteur ou du Surveillant Général";
+
+    const updatedPunition: PunitionScolaire = {
+      ...target,
+      statut: 'ANNULEE',
+      annule_par_id: operator.id,
+      annule_par_nom: annuleParNom,
+      annule_le: annuleLeFormatted,
+      motif_annulation: motifAnnulation,
+      updated_at: now.toISOString(),
+    };
+
+    list[targetIdx] = updatedPunition;
+    this.setItem(STORAGE_KEYS.PUNITIONS, list);
+
+    const el = this.getEleveById(target.eleve_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'ANNULATION_PUNITION',
+      table_cible: 'punitions',
+      record_id: id,
+      details: `Annulation de la punition (${target.punition_appliquee}) de l'élève ${el?.nom} ${el?.prenom}. Statut: ANNULÉE. Annulée par: ${annuleParNom}. Motif: ${motifAnnulation}`,
+    });
+
+    return updatedPunition;
+  }
+
+  public deletePunition(id: string, operator: UserProfile, motif?: string): boolean {
+    this.annulerPunition(id, operator, motif);
+    return true;
+  }
+
+  // ====================================================================
+  // MODULE : SANCTIONS DISCIPLINAIRES ADMINISTRATIVES (Direction & Censeur)
+  // ====================================================================
+  public getSanctionsDisciplinaires(anneeScolaire?: string): SanctionDisciplinaire[] {
+    const list = this.getItem<SanctionDisciplinaire[]>(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, SEED_SANCTIONS);
+    if (!anneeScolaire) return list;
+    return list.filter((s) => s.annee_scolaire === anneeScolaire);
+  }
+
+  public getSanctionsByEleve(eleveId: string, anneeScolaire?: string): SanctionDisciplinaire[] {
+    return this.getSanctionsDisciplinaires(anneeScolaire).filter((s) => s.eleve_id === eleveId);
+  }
+
+  public saveSanctionDisciplinaire(
+    data: Omit<SanctionDisciplinaire, 'id' | 'created_at' | 'updated_at' | 'enregistre_par_id' | 'enregistre_par_nom'>,
+    operator: UserProfile
+  ): SanctionDisciplinaire {
+    const canManageSanction = this.canAdminister(operator) || operator.role === 'SURVEILLANT_GENERAL';
+    if (!canManageSanction) {
+      throw new Error("Action non autorisée : Seule l'Administration (Censeur, DG, SG) peut enregistrer une sanction disciplinaire officielle.");
+    }
+
+    const list = this.getSanctionsDisciplinaires();
+    const id = `sct-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const newSanction: SanctionDisciplinaire = {
+      ...data,
+      id,
+      enregistre_par_id: operator.id,
+      enregistre_par_nom: `${operator.nom} ${operator.prenom}`,
+      created_at: now,
+      updated_at: now,
+    };
+
+    list.unshift(newSanction);
+    this.setItem(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, list);
+
+    const el = this.getEleveById(data.eleve_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'DECISION_SANCTION_DISCIPLINAIRE',
+      table_cible: 'sanctions_disciplinaires',
+      record_id: id,
+      details: `Sanction officielle "${data.nature_decision}" prononcée contre ${el?.nom} ${el?.prenom} pour "${data.motif}" par ${data.autorite_decision}`,
+    });
+
+    return newSanction;
+  }
+
+  public updateSanctionStatus(id: string, statut: StatutSanction, operator: UserProfile): SanctionDisciplinaire {
+    const canManageSanction = this.canAdminister(operator) || operator.role === 'SURVEILLANT_GENERAL';
+    if (!canManageSanction) throw new Error("Action non autorisée.");
+
+    const list = this.getSanctionsDisciplinaires();
+    const idx = list.findIndex((s) => s.id === id);
+    if (idx === -1) throw new Error("Sanction non trouvée.");
+
+    list[idx] = {
+      ...list[idx],
+      statut,
+      updated_at: new Date().toISOString(),
+    };
+    this.setItem(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'STATUT_SANCTION_MODIFIE',
+      table_cible: 'sanctions_disciplinaires',
+      record_id: id,
+      details: `Statut de la sanction ${id} mis à jour : ${statut}`,
+    });
+
+    return list[idx];
+  }
+
+  public deleteSanctionDisciplinaire(id: string, operator: UserProfile): boolean {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seule la Direction peut supprimer une sanction disciplinaire enregistrée.");
+    }
+    const list = this.getSanctionsDisciplinaires();
+    const updated = list.filter((s) => s.id !== id);
+    this.setItem(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_SANCTION_DISCIPLINAIRE',
+      table_cible: 'sanctions_disciplinaires',
+      record_id: id,
+      details: `Suppression sanction ${id}`,
+    });
+
+    return true;
+  }
+
+  // ====================================================================
+  // MODULE : SÉANCES DE COURS, EMPLOI DU TEMPS & PRÉSENCES PAR SÉANCE
+  // ====================================================================
+  public getSeancesCours(anneeScolaire?: string): SeanceCours[] {
+    const annee = anneeScolaire || this.getParametres().annee_academique || '2026–2027';
+    let list = this.getItem<SeanceCours[]>(STORAGE_KEYS.SEANCES_COURS, SEED_SEANCES_COURS);
+    
+    // Génération automatique des séances régulières depuis les affectations actives si vide
+    if (list.filter((s) => s.annee_scolaire === annee).length === 0) {
+      const affectations = this.getAffectations(annee).filter((a) => a.statut === 'ACTIF');
+      if (affectations.length > 0) {
+        const generated: SeanceCours[] = [];
+        const jours: JourSemaine[] = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI'];
+        const creneaux = [
+          { debut: '08:00', fin: '10:00' },
+          { debut: '10:00', fin: '12:00' },
+          { debut: '15:00', fin: '17:00' },
+        ];
+
+        affectations.forEach((aff, idx) => {
+          const prof = this.getProfileById(aff.profile_id);
+          const jour = jours[idx % jours.length];
+          const creneau = creneaux[idx % creneaux.length];
+          const cls = this.getClasseById(aff.classe_id);
+
+          generated.push({
+            id: `sec-${aff.id}-1`,
+            annee_scolaire: annee,
+            affectation_id: aff.id,
+            classe_id: aff.classe_id,
+            matiere_id: aff.matiere_id,
+            enseignant_id: aff.profile_id,
+            enseignant_nom: prof ? `${prof.nom} ${prof.prenom}` : undefined,
+            jour,
+            heure_debut: creneau.debut,
+            heure_fin: creneau.fin,
+            salle: cls?.salle || `Salle ${cls?.nom || 'A'}`,
+            statut: 'ACTIF',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+
+        list = [...list, ...generated];
+        this.setItem(STORAGE_KEYS.SEANCES_COURS, list);
+      }
+    }
+
+    if (!anneeScolaire) return list;
+    return list.filter((s) => s.annee_scolaire === anneeScolaire);
+  }
+
+  public getSeancesByEnseignant(enseignantId: string, anneeScolaire?: string): SeanceCours[] {
+    return this.getSeancesCours(anneeScolaire).filter((s) => s.enseignant_id === enseignantId);
+  }
+
+  public getSeancesByClasse(classeId: string, anneeScolaire?: string): SeanceCours[] {
+    return this.getSeancesCours(anneeScolaire).filter((s) => s.classe_id === classeId);
+  }
+
+  public getPresenceSeance(seanceId: string, date: string): EnregistrementPresence[] {
+    return this.getPresences().filter((p) => p.seance_id === seanceId && p.date === date);
+  }
+
+  public createSeanceCours(
+    data: Omit<SeanceCours, 'id' | 'created_at' | 'updated_at'>,
+    operator: UserProfile
+  ): SeanceCours {
+    const list = this.getSeancesCours(data.annee_scolaire);
+    const id = `sec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    const newSeance: SeanceCours = {
+      ...data,
+      id,
+      created_at: now,
+      updated_at: now,
+    };
+    this.setItem(STORAGE_KEYS.SEANCES_COURS, [...list, newSeance]);
+    return newSeance;
+  }
+
+  public savePresenceSeance(
+    seance: SeanceCours,
+    date: string,
+    items: Array<{ eleve_id: string; statut: StatutPresence; motif?: string; heure_retard?: string; justifie?: boolean }>,
+    operator: UserProfile
+  ): EnregistrementPresence[] {
+    const isOwner = seance.enseignant_id === operator.id;
+    const canRecord = isOwner || operator.role === 'SURVEILLANT_GENERAL' || this.canAdminister(operator);
+    if (!canRecord) {
+      throw new Error("Action non autorisée : Seul l'enseignant titulaire de la séance ou la Surveillance peut enregistrer cet appel.");
+    }
+
+    const allPresences = this.getPresences();
+    const periodes = this.getPeriodesByAnnee(seance.annee_scolaire);
+    const activePeriode = periodes.find((p) => p.is_active) || periodes[0];
+
+    const mat = this.getMatiereById(seance.matiere_id);
+    const prof = this.getProfileById(seance.enseignant_id);
+    const now = new Date().toISOString();
+    const savedEntries: EnregistrementPresence[] = [];
+
+    items.forEach((item) => {
+      // Clé unique par cours : un apprenant a un enregistrement distinct par séance (sans écraser un autre cours le même jour !)
+      const existingIdx = allPresences.findIndex(
+        (p) =>
+          p.eleve_id === item.eleve_id &&
+          p.date === date &&
+          p.seance_id === seance.id
+      );
+
+      const entry: EnregistrementPresence = {
+        id: existingIdx >= 0 ? allPresences[existingIdx].id : `prsc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        annee_scolaire: seance.annee_scolaire,
+        classe_id: seance.classe_id,
+        eleve_id: item.eleve_id,
+        date,
+        statut: item.statut,
+        motif: item.motif,
+        justifie: item.justifie ?? false,
+        heure_retard: item.heure_retard || (item.statut === 'RETARD' ? seance.heure_debut : undefined),
+        enregistre_par_id: operator.id,
+        enregistre_par_nom: `${operator.nom} ${operator.prenom}`,
+        date_saisie: now,
+        periode_id: activePeriode?.id,
+        enseignant_id: seance.enseignant_id,
+        enseignant_nom: prof ? `${prof.nom} ${prof.prenom}` : undefined,
+        matiere_id: seance.matiere_id,
+        matiere_nom: mat?.nom,
+        seance_id: seance.id,
+        heure_debut: seance.heure_debut,
+        heure_fin: seance.heure_fin,
+        created_at: existingIdx >= 0 ? allPresences[existingIdx].created_at : now,
+        updated_at: now,
+      };
+
+      if (existingIdx >= 0) {
+        allPresences[existingIdx] = entry;
+      } else {
+        allPresences.push(entry);
+      }
+      savedEntries.push(entry);
+    });
+
+    this.setItem(STORAGE_KEYS.PRESENCES, allPresences);
+
+    const cls = this.getClasseById(seance.classe_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'APPEL_COURS_SEANCE',
+      table_cible: 'presences',
+      record_id: seance.id,
+      details: `Appel effectué pour le cours de ${mat?.nom} en ${cls?.nom} (${seance.heure_debut}–${seance.heure_fin}) le ${date} : ${items.length} élèves pointés`,
+    });
+
+    return savedEntries;
+  }
+
+  // ====================================================================
+  // MODULE : ESPACE PARENTS D'ÉLÈVES & LIAISONS SÉCURISÉES
+  // ====================================================================
+  public getParents(): ParentProfile[] {
+    return this.getItem<ParentProfile[]>(STORAGE_KEYS.PARENTS, []);
+  }
+
+  public getParentById(id: string): ParentProfile | undefined {
+    return this.getParents().find((p) => p.id === id);
+  }
+
+  public getParentByProfileId(profileId: string): ParentProfile | undefined {
+    return this.getParents().find((p) => p.profile_id === profileId);
+  }
+
+  public getParentByPhoneOrEmail(identifier: string): ParentProfile | undefined {
+    const clean = identifier.trim().toLowerCase();
+    const cleanPhone = clean.replace(/[^0-9]/g, '');
+    return this.getParents().find((p) => {
+      if (p.email && p.email.toLowerCase() === clean) return true;
+      if (p.telephone) {
+        const pPhone = p.telephone.replace(/[^0-9]/g, '');
+        if (pPhone && cleanPhone && (pPhone === cleanPhone || pPhone.endsWith(cleanPhone) || cleanPhone.endsWith(pPhone))) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  public createParent(
+    data: {
+      nom: string;
+      prenom: string;
+      telephone: string;
+      email?: string;
+      profession?: string;
+      adresse?: string;
+      password?: string;
+      eleves?: { eleve_id: string; lien_parental: LienParental }[];
+    },
+    operator: UserProfile
+  ): ParentProfile {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur, le Concepteur ou la Direction peut créer un compte parent.");
+    }
+
+    const cleanTel = data.telephone.trim();
+    if (!cleanTel) throw new Error("Le numéro de téléphone du parent est obligatoire.");
+
+    const parents = this.getParents();
+    const cleanDigits = cleanTel.replace(/[^0-9]/g, '');
+    const exists = parents.some((p) => p.telephone.replace(/[^0-9]/g, '') === cleanDigits);
+    if (exists) {
+      throw new Error(`Un compte parent existe déjà avec ce numéro de téléphone (${cleanTel}).`);
+    }
+
+    const now = new Date().toISOString();
+    const parentId = `par-${Date.now().toString(36)}`;
+    const profileId = `usr-par-${Date.now().toString(36)}`;
+
+    const newParent: ParentProfile = {
+      id: parentId,
+      profile_id: profileId,
+      nom: data.nom.trim().toUpperCase(),
+      prenom: data.prenom.trim(),
+      telephone: cleanTel,
+      email: data.email?.trim().toLowerCase() || undefined,
+      profession: data.profession?.trim() || undefined,
+      adresse: data.adresse?.trim() || undefined,
+      statut: 'ACTIF',
+      created_at: now,
+      updated_at: now,
+    };
+
+    parents.push(newParent);
+    this.setItem(STORAGE_KEYS.PARENTS, parents);
+
+    // Profil utilisateur pour l'authentification
+    const profiles = this.getProfiles();
+    const userEmail = newParent.email || `${cleanDigits}@parent.ceggogbo.bj`;
+    const newUser: UserProfile = {
+      id: profileId,
+      email: userEmail,
+      nom: newParent.nom,
+      prenom: newParent.prenom,
+      role: 'PARENT',
+      is_enseignant: false,
+      telephone: newParent.telephone,
+      adresse: newParent.adresse,
+      statut: 'ACTIF',
+      created_at: now,
+      updated_at: now,
+    };
+    profiles.push(newUser);
+    this.setItem(STORAGE_KEYS.PROFILES, profiles);
+
+    // Définition du mot de passe
+    const pass = data.password?.trim() || 'Passer123!';
+    this.setUserPassword(profileId, pass);
+
+    // Rattachement des élèves
+    if (data.eleves && data.eleves.length > 0) {
+      const links = this.getParentEleves();
+      data.eleves.forEach((item) => {
+        links.push({
+          id: `pe-${parentId}-${item.eleve_id}`,
+          parent_id: parentId,
+          eleve_id: item.eleve_id,
+          lien_parental: item.lien_parental || 'PERE',
+          statut: 'ACTIF',
+          created_at: now,
+          updated_at: now,
+        });
+      });
+      this.setItem(STORAGE_KEYS.PARENT_ELEVES, links);
+    }
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'CREATION_COMPTE_PARENT',
+      table_cible: 'parents',
+      record_id: parentId,
+      details: `Création du compte parent pour ${newParent.nom} ${newParent.prenom} (Tél: ${newParent.telephone}) avec ${data.eleves?.length || 0} élève(s) rattaché(s).`,
+    });
+
+    return newParent;
+  }
+
+  public updateParent(
+    id: string,
+    updates: Partial<ParentProfile>,
+    operator: UserProfile
+  ): ParentProfile {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction peut modifier un compte parent.");
+    }
+    const parents = this.getParents();
+    const idx = parents.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error("Compte parent introuvable.");
+
+    const updated: ParentProfile = {
+      ...parents[idx],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    parents[idx] = updated;
+    this.setItem(STORAGE_KEYS.PARENTS, parents);
+
+    // Synchroniser le profil UserProfile
+    if (updated.profile_id) {
+      const profiles = this.getProfiles();
+      const uIdx = profiles.findIndex((p) => p.id === updated.profile_id);
+      if (uIdx !== -1) {
+        profiles[uIdx] = {
+          ...profiles[uIdx],
+          nom: updated.nom,
+          prenom: updated.prenom,
+          telephone: updated.telephone,
+          email: updated.email || profiles[uIdx].email,
+          statut: updated.statut,
+          updated_at: updated.updated_at,
+        };
+        this.setItem(STORAGE_KEYS.PROFILES, profiles);
+      }
+    }
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'MODIFICATION_COMPTE_PARENT',
+      table_cible: 'parents',
+      record_id: id,
+      details: `Mise à jour des coordonnées du parent ${updated.nom} ${updated.prenom}.`,
+    });
+
+    return updated;
+  }
+
+  public toggleParentStatus(id: string, operator: UserProfile): ParentProfile {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée.");
+    }
+    const parent = this.getParentById(id);
+    if (!parent) throw new Error("Parent introuvable.");
+    const newStatus = parent.statut === 'ACTIF' ? 'INACTIF' : 'ACTIF';
+    return this.updateParent(id, { statut: newStatus }, operator);
+  }
+
+  // --- LIENS PARENT - ELEVES ---
+  public getParentEleves(): ParentEleve[] {
+    return this.getItem<ParentEleve[]>(STORAGE_KEYS.PARENT_ELEVES, []);
+  }
+
+  public getParentElevesByParent(parentId: string): ParentEleve[] {
+    return this.getParentEleves().filter((pe) => pe.parent_id === parentId && pe.statut === 'ACTIF');
+  }
+
+  public getParentElevesByEleve(eleveId: string): ParentEleve[] {
+    return this.getParentEleves().filter((pe) => pe.eleve_id === eleveId && pe.statut === 'ACTIF');
+  }
+
+  public linkParentToEleve(
+    data: { parent_id: string; eleve_id: string; lien_parental: LienParental },
+    operator: UserProfile
+  ): ParentEleve {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction peut rattacher un élève à un parent.");
+    }
+    const links = this.getParentEleves();
+    const existing = links.find((l) => l.parent_id === data.parent_id && l.eleve_id === data.eleve_id);
+    if (existing) {
+      if (existing.statut === 'ACTIF') {
+        throw new Error("Cet élève est déjà rattaché à ce compte parent.");
+      } else {
+        existing.statut = 'ACTIF';
+        existing.lien_parental = data.lien_parental;
+        existing.updated_at = new Date().toISOString();
+        this.setItem(STORAGE_KEYS.PARENT_ELEVES, links);
+        return existing;
+      }
+    }
+
+    const now = new Date().toISOString();
+    const newLink: ParentEleve = {
+      id: `pe-${Date.now().toString(36)}`,
+      parent_id: data.parent_id,
+      eleve_id: data.eleve_id,
+      lien_parental: data.lien_parental,
+      statut: 'ACTIF',
+      created_at: now,
+      updated_at: now,
+    };
+    links.push(newLink);
+    this.setItem(STORAGE_KEYS.PARENT_ELEVES, links);
+
+    const el = this.getEleveById(data.eleve_id);
+    const par = this.getParentById(data.parent_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'RATTACHEMENT_PARENT_ELEVE',
+      table_cible: 'parent_eleves',
+      record_id: newLink.id,
+      details: `Rattachement de l'élève ${el?.nom} ${el?.prenom} au parent ${par?.nom} ${par?.prenom} (${data.lien_parental}).`,
+    });
+
+    return newLink;
+  }
+
+  public unlinkParentFromEleve(linkId: string, operator: UserProfile): boolean {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée.");
+    }
+    const links = this.getParentEleves();
+    const idx = links.findIndex((l) => l.id === linkId);
+    if (idx === -1) throw new Error("Lien introuvable.");
+
+    links[idx].statut = 'INACTIF';
+    links[idx].updated_at = new Date().toISOString();
+    this.setItem(STORAGE_KEYS.PARENT_ELEVES, links);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'DETACHEMENT_PARENT_ELEVE',
+      table_cible: 'parent_eleves',
+      record_id: linkId,
+      details: `Détachement du lien parental ${linkId}.`,
+    });
+
+    return true;
+  }
+
+  public getElevesForParent(parentIdOrProfileId: string, anneeScolaire?: string): Eleve[] {
+    let parent = this.getParentById(parentIdOrProfileId);
+    if (!parent) {
+      parent = this.getParentByProfileId(parentIdOrProfileId);
+    }
+    if (!parent) return [];
+
+    const links = this.getParentElevesByParent(parent.id);
+    if (links.length === 0) return [];
+
+    const eleveIds = new Set(links.map((l) => l.eleve_id));
+    const allEleves = this.getEleves(anneeScolaire);
+    return allEleves.filter((e) => eleveIds.has(e.id) && e.statut === 'ACTIF');
+  }
+
+  public getElevesByParent(parentIdOrProfileId: string, anneeScolaire?: string): Eleve[] {
+    return this.getElevesForParent(parentIdOrProfileId, anneeScolaire);
+  }
+
+  // ====================================================================
+  // MODULE : DISCIPLINE & VIE SCOLAIRE (SURVEILLANT GÉNÉRAL)
+  // ====================================================================
+  public getIncidentsDisciplinaires(anneeScolaire?: string): IncidentDisciplinaire[] {
+    const list = this.getItem<IncidentDisciplinaire[]>(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, []);
+    if (!anneeScolaire) return list;
+    return list.filter((i) => i.annee_scolaire === anneeScolaire);
+  }
+
+  public getIncidentsByEleve(eleveId: string, anneeScolaire?: string): IncidentDisciplinaire[] {
+    return this.getIncidentsDisciplinaires(anneeScolaire).filter((i) => i.eleve_id === eleveId);
+  }
+
+  public getIncidentsByClasse(classeId: string, anneeScolaire?: string): IncidentDisciplinaire[] {
+    return this.getIncidentsDisciplinaires(anneeScolaire).filter((i) => i.classe_id === classeId);
+  }
+
+  public saveIncident(
+    data: Omit<IncidentDisciplinaire, 'id' | 'created_at' | 'updated_at'>,
+    operator: UserProfile
+  ): IncidentDisciplinaire {
+    const canDiscipline = operator.role === 'SURVEILLANT_GENERAL' || this.canAdminister(operator);
+    if (!canDiscipline) {
+      throw new Error("Action non autorisée : Seul le Surveillant Général ou la Direction peut enregistrer un incident disciplinaire.");
+    }
+
+    const list = this.getIncidentsDisciplinaires();
+    const now = new Date().toISOString();
+    const newIncident: IncidentDisciplinaire = {
+      ...data,
+      id: `inc-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: now,
+      updated_at: now,
+    };
+
+    list.unshift(newIncident);
+    this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, list);
+
+    const el = this.getEleveById(data.eleve_id);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'ENREGISTREMENT_INCIDENT_DISCIPLINAIRE',
+      table_cible: 'incidents_disciplinaires',
+      record_id: newIncident.id,
+      details: `Incident (${data.type_incident}) pour l'élève ${el?.nom} ${el?.prenom} : ${data.description.substring(0, 60)}... Mesure: ${data.mesure_prise}`,
+    });
+
+    return newIncident;
+  }
+
+  public deleteIncident(id: string, operator: UserProfile): boolean {
+    const canDiscipline = operator.role === 'SURVEILLANT_GENERAL' || this.canAdminister(operator);
+    if (!canDiscipline) {
+      throw new Error("Action non autorisée.");
+    }
+    const list = this.getIncidentsDisciplinaires();
+    const filtered = list.filter((i) => i.id !== id);
+    this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, filtered);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_INCIDENT_DISCIPLINAIRE',
+      table_cible: 'incidents_disciplinaires',
+      record_id: id,
+      details: `Suppression de l'incident disciplinaire ${id}.`,
+    });
+
+    return true;
+  }
+
+  // ====================================================================
+  // MODULE : NOTIFICATIONS PARENTS
+  // ====================================================================
+  public getNotificationsParents(parentId?: string, anneeScolaire?: string): NotificationParent[] {
+    const list = this.getItem<NotificationParent[]>(STORAGE_KEYS.NOTIFICATIONS_PARENTS, []);
+    return list.filter((n) => {
+      if (parentId && n.parent_id !== parentId) return false;
+      if (anneeScolaire && n.annee_scolaire !== anneeScolaire) return false;
+      return true;
+    });
+  }
+
+  public createNotificationParent(
+    data: Omit<NotificationParent, 'id' | 'created_at' | 'lu'>
+  ): NotificationParent {
+    const list = this.getNotificationsParents();
+    const newNotif: NotificationParent = {
+      ...data,
+      id: `notif-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      lu: false,
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(newNotif);
+    this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, list);
+    return newNotif;
+  }
+
+  public markNotificationAsRead(id: string): void {
+    const list = this.getNotificationsParents();
+    const notif = list.find((n) => n.id === id);
+    if (notif) {
+      notif.lu = true;
+      this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, list);
+    }
+  }
   /**
    * SOURCE UNIQUE & EXCLUSIVE DES MATIÈRES D'UN ENSEIGNANT :
    * Récupère la liste dédupliquée des matières RÉELLEMENT attribuées
@@ -2417,7 +4230,11 @@ class StorageEngine {
    * Ne déduit, n'invente et ne préremplit JAMAIS de matière fictive.
    */
   public getMatieresAttribueesEnseignant(profileId: string, anneeScolaire: string): string[] {
-    const affectations = this.getAffectationsByProfile(profileId, anneeScolaire);
+    const targetAnneeNorm = (anneeScolaire || '2026–2027').replace(/[-—–]/g, '-').trim();
+    const affectations = this.getAffectations().filter((a) => {
+      const aAnneeNorm = (a.annee_scolaire || '2026–2027').replace(/[-—–]/g, '-').trim();
+      return a.profile_id === profileId && a.statut === 'ACTIF' && aAnneeNorm === targetAnneeNorm;
+    });
     const matieresSet = new Set<string>();
     for (const aff of affectations) {
       if (aff.statut === 'ACTIF') {
@@ -2432,12 +4249,12 @@ class StorageEngine {
 
   /**
    * Retourne le libellé officiel des matières attribuées (ex: "SVT, Mathématiques")
-   * ou "Aucune matière attribuée" si le professeur n'a aucune attribution active pour cette année.
+   * ou "Aucune attribution (Année)" si le professeur n'a aucune attribution active pour cette année.
    */
   public getMatieresAttribueesLabel(profileId: string, anneeScolaire: string): string {
     const matieres = this.getMatieresAttribueesEnseignant(profileId, anneeScolaire);
     if (matieres.length === 0) {
-      return 'Aucune matière attribuée';
+      return `Aucune attribution (${anneeScolaire || '2026–2027'})`;
     }
     return matieres.join(', ');
   }
@@ -2465,7 +4282,7 @@ class StorageEngine {
   }
 
   public canManagePresencesEnseignants(operator: UserProfile): boolean {
-    return ['CENSEUR', 'CONCEPTEUR', 'DIRECTEUR_GENERAL'].includes(operator.role);
+    return operator.role === 'CENSEUR';
   }
 
   public async savePresenceEnseignant(
@@ -2473,7 +4290,7 @@ class StorageEngine {
     operator: UserProfile
   ): Promise<PresenceEnseignant> {
     if (!this.canManagePresencesEnseignants(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou l'Administration peut enregistrer la présence journalière des enseignants.");
+      throw new Error("Action non autorisée : Seul le Censeur est habilité à enregistrer ou modifier la présence journalière des enseignants.");
     }
 
     const list = this.getPresencesEnseignants();
@@ -2574,7 +4391,7 @@ class StorageEngine {
     operator: UserProfile
   ): Promise<PresenceEnseignant[]> {
     if (!this.canManagePresencesEnseignants(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou l'Administration peut enregistrer la présence des enseignants.");
+      throw new Error("Action non autorisée : Seul le Censeur est habilité à enregistrer la présence des enseignants.");
     }
     const results: PresenceEnseignant[] = [];
     for (const entry of entries) {
@@ -2586,7 +4403,7 @@ class StorageEngine {
 
   public async deletePresenceEnseignant(id: string, operator: UserProfile): Promise<boolean> {
     if (!this.canManagePresencesEnseignants(operator)) {
-      throw new Error("Action non autorisée.");
+      throw new Error("Action non autorisée : Seul le Censeur est habilité à supprimer un enregistrement de présence.");
     }
     const list = this.getPresencesEnseignants();
     const item = list.find((p) => p.id === id);
@@ -2617,9 +4434,363 @@ class StorageEngine {
     return true;
   }
 
+  // ====================================================================
+  // MODULE : PROFESSEURS PRINCIPAUX (RÉSERVÉ AU CENSEUR)
+  // ====================================================================
+  public getProfesseursPrincipaux(anneeScolaire?: string | any): ProfesseurPrincipal[] {
+    let list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const PP_INIT_KEY = 'gogbo_v2_pp_initialized_v1';
+    if (!this.rawGet(PP_INIT_KEY)) {
+      if (!list || list.length === 0) {
+        list = [
+          {
+            id: 'pp-seed-censeur-4a',
+            profile_id: 'usr-censeur',
+            classe_id: 'cls-4a',
+            annee_scolaire: '2026–2027',
+            statut: 'ACTIF',
+            date_nomination: '2026-09-15',
+            created_at: '2026-09-15T08:00:00Z',
+            updated_at: '2026-09-15T08:00:00Z',
+          },
+        ];
+        this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+      }
+      this.rawSet(PP_INIT_KEY, 'true');
+    }
+
+    if (!anneeScolaire) return list;
+    const str = typeof anneeScolaire === 'string' ? anneeScolaire : (anneeScolaire?.libelle || '');
+    if (!str) return list;
+    const targetNorm = str.replace(/[-—–]/g, '-').trim();
+    return list.filter((p) => (p.annee_scolaire || '').replace(/[-—–]/g, '-').trim() === targetNorm);
+  }
+
+  public getActiveProfesseurPrincipalByClasse(classeId: string, anneeScolaire: string | any): ProfesseurPrincipal | undefined {
+    const str = typeof anneeScolaire === 'string' ? anneeScolaire : (anneeScolaire?.libelle || '');
+    const targetNorm = str.replace(/[-—–]/g, '-').trim();
+    return this.getProfesseursPrincipaux().find(
+      (p) => p.classe_id === classeId &&
+        (p.annee_scolaire || '').replace(/[-—–]/g, '-').trim() === targetNorm &&
+        p.statut === 'ACTIF'
+    );
+  }
+
+  public getActiveProfesseurPrincipalByEnseignant(profileId: string, anneeScolaire: string | any): ProfesseurPrincipal | undefined {
+    const str = typeof anneeScolaire === 'string' ? anneeScolaire : (anneeScolaire?.libelle || '');
+    const targetNorm = str.replace(/[-—–]/g, '-').trim();
+    return this.getProfesseursPrincipaux().find(
+      (p) => p.profile_id === profileId &&
+        (p.annee_scolaire || '').replace(/[-—–]/g, '-').trim() === targetNorm &&
+        p.statut === 'ACTIF'
+    );
+  }
+
+  public isProfesseurPrincipalOfClasse(profileId: string, classeId: string, anneeScolaire: string | any): boolean {
+    const pp = this.getActiveProfesseurPrincipalByEnseignant(profileId, anneeScolaire);
+    return !!(pp && pp.classe_id === classeId && pp.statut === 'ACTIF');
+  }
+
+  public isProfesseurPrincipal(profileId: string, anneeScolaire?: string | any): boolean {
+    const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
+    const pp = this.getActiveProfesseurPrincipalByEnseignant(profileId, annee);
+    return !!(pp && pp.statut === 'ACTIF');
+  }
+
+  public getClasseProfesseurPrincipal(profileId: string, anneeScolaire?: string | any): Classe | undefined {
+    const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
+    const pp = this.getActiveProfesseurPrincipalByEnseignant(profileId, annee);
+    if (!pp || pp.statut !== 'ACTIF') return undefined;
+    return this.getClasseById(pp.classe_id);
+  }
+
+  /**
+   * ATTRIBUTION D'UN PROFESSEUR PRINCIPAL PAR LE CENSEUR
+   * RÈGLE ABSOLUE 1 : UN ENSEIGNANT = UNE SEULE CLASSE COMME PP POUR L'ANNÉE SCOLAIRE.
+   * RÈGLE ABSOLUE 2 : UNE CLASSE = UN SEUL PP ACTIF POUR L'ANNÉE SCOLAIRE.
+   */
+  public async assignProfesseurPrincipal(
+    data: {
+      profile_id: string;
+      classe_id: string;
+      annee_scolaire: string;
+      date_nomination?: string;
+    },
+    operator: UserProfile
+  ): Promise<ProfesseurPrincipal> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit d'attribuer le rôle de Professeur Principal.");
+    }
+
+    const teacher = this.getProfileById(data.profile_id);
+    if (!teacher) throw new Error("Enseignant introuvable dans le système.");
+
+    const classe = this.getClasseById(data.classe_id);
+    if (!classe) throw new Error("Classe introuvable dans le système.");
+
+    const anneeNorm = data.annee_scolaire || this.getActiveAnneeScolaire().libelle;
+
+    // RÈGLE ABSOLUE 1 : Vérifier si cet enseignant est déjà PP d'une autre classe pour la même année scolaire
+    const existingForTeacher = this.getActiveProfesseurPrincipalByEnseignant(data.profile_id, anneeNorm);
+    if (existingForTeacher) {
+      const existingClass = this.getClasseById(existingForTeacher.classe_id);
+      const existingClassName = existingClass ? existingClass.nom : existingForTeacher.classe_id;
+      throw new Error(
+        `⚠️ Cet enseignant (${teacher.nom} ${teacher.prenom}) est déjà Professeur Principal de la classe ${existingClassName} pour l'année scolaire ${anneeNorm}. Règle absolue : un enseignant ne peut être Professeur Principal que d'une seule classe par année. Veuillez d'abord retirer ou clôturer son attribution actuelle avant de lui assigner une autre classe.`
+      );
+    }
+
+    // RÈGLE ABSOLUE 2 : Vérifier si cette classe a déjà un PP actif pour la même année scolaire
+    const existingForClass = this.getActiveProfesseurPrincipalByClasse(data.classe_id, anneeNorm);
+    if (existingForClass) {
+      const currentPPTeacher = this.getProfileById(existingForClass.profile_id);
+      const ppName = currentPPTeacher ? `${currentPPTeacher.nom} ${currentPPTeacher.prenom}` : 'un autre enseignant';
+      throw new Error(
+        `⚠️ La classe ${classe.nom} possède déjà un Professeur Principal actif (${ppName}) pour l'année scolaire ${anneeNorm}. Règle absolue : une classe ne peut avoir qu'un seul PP actif. Veuillez d'abord retirer l'attribution actuelle.`
+      );
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const id = `pp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const newPP: ProfesseurPrincipal = {
+      id,
+      profile_id: data.profile_id,
+      classe_id: data.classe_id,
+      annee_scolaire: anneeNorm,
+      statut: 'ACTIF',
+      date_nomination: data.date_nomination || now.split('T')[0],
+      created_at: now,
+      updated_at: now,
+    };
+
+    list.push(newPP);
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'ATTRIBUTION_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Nomination PP (${anneeNorm}) : ${teacher.nom} ${teacher.prenom} nommé Professeur Principal de la classe ${classe.nom}`,
+    });
+
+    // Synchronisation Supabase si connecté
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').insert({
+          id: newPP.id,
+          profile_id: newPP.profile_id,
+          classe_id: newPP.classe_id,
+          annee_scolaire: newPP.annee_scolaire,
+          statut: newPP.statut,
+          date_nomination: newPP.date_nomination,
+          created_at: newPP.created_at,
+          updated_at: newPP.updated_at,
+        });
+      } catch (err) {
+        console.warn('Sync Supabase professeurs_principaux failed:', err);
+      }
+    }
+
+    return newPP;
+  }
+
+  /**
+   * MODIFIER UNE ATTRIBUTION DE PROFESSEUR PRINCIPAL PAR LE CENSEUR
+   */
+  public async updateProfesseurPrincipal(
+    id: string,
+    updates: {
+      profile_id?: string;
+      classe_id?: string;
+      date_nomination?: string;
+    },
+    operator: UserProfile
+  ): Promise<ProfesseurPrincipal> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de modifier une attribution de Professeur Principal.");
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error("Attribution de Professeur Principal introuvable.");
+
+    const current = list[idx];
+    const targetProfileId = updates.profile_id || current.profile_id;
+    const targetClasseId = updates.classe_id || current.classe_id;
+    const anneeNorm = current.annee_scolaire;
+
+    // RÈGLE ABSOLUE 1 : Si changement d'enseignant, vérifier que le nouvel enseignant n'est pas déjà PP actif
+    if (targetProfileId !== current.profile_id) {
+      const existingForTeacher = this.getActiveProfesseurPrincipalByEnseignant(targetProfileId, anneeNorm);
+      if (existingForTeacher && existingForTeacher.id !== id) {
+        const teacher = this.getProfileById(targetProfileId);
+        const existingClass = this.getClasseById(existingForTeacher.classe_id);
+        throw new Error(
+          `Cet enseignant (${teacher?.nom} ${teacher?.prenom}) est déjà Professeur Principal de la classe ${existingClass?.nom || existingForTeacher.classe_id} pour l'année scolaire ${anneeNorm}. Règle absolue : un enseignant ne peut être Professeur Principal que d'une seule classe par année.`
+        );
+      }
+    }
+
+    // RÈGLE ABSOLUE 2 : Si changement de classe, vérifier que la nouvelle classe n'a pas déjà un PP actif
+    if (targetClasseId !== current.classe_id) {
+      const existingForClass = this.getActiveProfesseurPrincipalByClasse(targetClasseId, anneeNorm);
+      if (existingForClass && existingForClass.id !== id) {
+        const classe = this.getClasseById(targetClasseId);
+        const ppProf = this.getProfileById(existingForClass.profile_id);
+        throw new Error(
+          `La classe ${classe?.nom || targetClasseId} possède déjà un Professeur Principal actif (${ppProf?.nom} ${ppProf?.prenom}) pour l'année scolaire ${anneeNorm}. Règle absolue : une classe ne peut avoir qu'un seul PP actif.`
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const updated: ProfesseurPrincipal = {
+      ...current,
+      profile_id: targetProfileId,
+      classe_id: targetClasseId,
+      date_nomination: updates.date_nomination || current.date_nomination,
+      updated_at: now,
+    };
+
+    list[idx] = updated;
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+
+    const teacher = this.getProfileById(updated.profile_id);
+    const classe = this.getClasseById(updated.classe_id);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'MODIFICATION_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Modification PP (${updated.annee_scolaire}) : ${teacher?.nom} ${teacher?.prenom} pour la classe ${classe?.nom}`,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').update({
+          profile_id: updated.profile_id,
+          classe_id: updated.classe_id,
+          date_nomination: updated.date_nomination,
+          updated_at: updated.updated_at,
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Sync Supabase update PP failed:', err);
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * RETIRER / CLÔTURER UNE ATTRIBUTION DE PROFESSEUR PRINCIPAL
+   * Conserve l'historique de l'ancienne attribution en passant le statut à 'CLOTURE'
+   */
+  public async retirerProfesseurPrincipal(
+    id: string,
+    operator: UserProfile,
+    motif?: string
+  ): Promise<ProfesseurPrincipal> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de retirer un Professeur Principal.");
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error("Attribution de Professeur Principal introuvable.");
+
+    const current = list[idx];
+    const teacher = this.getProfileById(current.profile_id);
+    const classe = this.getClasseById(current.classe_id);
+    const now = new Date().toISOString();
+
+    const updated: ProfesseurPrincipal = {
+      ...current,
+      statut: 'CLOTURE',
+      date_fin: now.split('T')[0],
+      motif_fin: motif || 'Retrait par décision du Censeur',
+      updated_at: now,
+    };
+
+    list[idx] = updated;
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'RETRAIT_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Retrait PP (${current.annee_scolaire}) : Fin de fonction PP pour ${teacher?.nom} ${teacher?.prenom} en ${classe?.nom}${motif ? ` (Motif : ${motif})` : ''}`,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').update({
+          statut: 'CLOTURE',
+          date_fin: updated.date_fin,
+          motif_fin: updated.motif_fin,
+          updated_at: updated.updated_at,
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Sync Supabase update PP failed:', err);
+      }
+    }
+
+    return updated;
+  }
+
+  public async deleteProfesseurPrincipal(id: string, operator: UserProfile): Promise<boolean> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur peut supprimer un enregistrement.");
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const item = list.find((p) => p.id === id);
+    if (!item) return false;
+
+    const teacher = this.getProfileById(item.profile_id);
+    const classe = this.getClasseById(item.classe_id);
+
+    const updated = list.filter((p) => p.id !== id);
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Suppression enregistrement PP : ${teacher?.nom} ${teacher?.prenom} (${classe?.nom} - ${item.annee_scolaire})`,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Sync Supabase delete PP failed:', err);
+      }
+    }
+
+    return true;
+  }
+
   // --- UTILITAIRES / EXPORT / RESET ---
   public resetToDefaults(): void {
-    localStorage.removeItem(STORAGE_KEYS.VERSION);
+    this.rawRemove(STORAGE_KEYS.VERSION);
     this.init();
   }
 
@@ -2630,6 +4801,7 @@ class StorageEngine {
       profiles: this.getProfiles(),
       classes: this.getClasses(),
       matieres: this.getMatieres(),
+      coefficients_classes: this.getCoefficientsClasses(),
       eleves: this.getEleves(),
       inscriptions: this.getInscriptions(),
       periodes: this.getPeriodes(),
@@ -2637,10 +4809,17 @@ class StorageEngine {
       notes: this.getNotes(),
       presences: this.getPresences(),
       presences_enseignants: this.getPresencesEnseignants(),
+      professeurs_principaux: this.getProfesseursPrincipaux(),
       paiements: this.getPaiements(),
+      contributions: this.getContributions(),
+      depenses: this.getDepenses(),
+      parents: this.getParents(),
+      parent_eleves: this.getParentEleves(),
+      incidents_disciplinaires: this.getIncidentsDisciplinaires(),
+      notifications_parents: this.getNotificationsParents(),
       audit_logs: this.getAuditLogs(),
       exported_at: new Date().toISOString(),
-      version: '2.2.0',
+      version: '2.5.0',
     };
     return JSON.stringify(data, null, 2);
   }
@@ -2654,6 +4833,7 @@ class StorageEngine {
         this.setItem(STORAGE_KEYS.PROFILES, data.profiles);
         this.setItem(STORAGE_KEYS.CLASSES, data.classes);
         this.setItem(STORAGE_KEYS.MATIERES, data.matieres);
+        if (data.coefficients_classes) this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, data.coefficients_classes);
         this.setItem(STORAGE_KEYS.ELEVES, data.eleves);
         if (data.inscriptions) this.setItem(STORAGE_KEYS.INSCRIPTIONS, data.inscriptions);
         this.setItem(STORAGE_KEYS.PERIODES, data.periodes);
@@ -2661,7 +4841,14 @@ class StorageEngine {
         this.setItem(STORAGE_KEYS.NOTES, data.notes);
         if (data.presences) this.setItem(STORAGE_KEYS.PRESENCES, data.presences);
         if (data.presences_enseignants) this.setItem(STORAGE_KEYS.PRESENCES_ENSEIGNANTS, data.presences_enseignants);
+        if (data.professeurs_principaux) this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, data.professeurs_principaux);
         if (data.paiements) this.setItem(STORAGE_KEYS.PAIEMENTS, data.paiements);
+        if (data.contributions) this.setItem(STORAGE_KEYS.CONTRIBUTIONS, data.contributions);
+        if (data.depenses) this.setItem(STORAGE_KEYS.DEPENSES, data.depenses);
+        if (data.parents) this.setItem(STORAGE_KEYS.PARENTS, data.parents);
+        if (data.parent_eleves) this.setItem(STORAGE_KEYS.PARENT_ELEVES, data.parent_eleves);
+        if (data.incidents_disciplinaires) this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, data.incidents_disciplinaires);
+        if (data.notifications_parents) this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, data.notifications_parents);
         this.setItem(STORAGE_KEYS.AUDIT_LOGS, data.audit_logs || []);
 
         this.addAuditLog({
@@ -2680,4 +4867,8 @@ class StorageEngine {
 }
 
 export const storage = new StorageEngine();
-storage.init();
+try {
+  storage.init();
+} catch (e) {
+  console.warn('Storage initial bootstrap notice:', e);
+}

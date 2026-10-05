@@ -127,8 +127,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
 
           <div className="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center space-x-2">
             <span className="text-slate-400">Période :</span>
-            <span className="font-semibold text-emerald-400">{activePeriode.nom}</span>
-            {activePeriode.is_locked || isArchive ? (
+            <span className="font-semibold text-emerald-400">{activePeriode?.nom || 'Période active'}</span>
+            {(activePeriode?.is_locked || isArchive) ? (
               <span className="bg-red-900/60 text-red-200 text-[10px] px-1.5 py-0.5 rounded">Verrouillé</span>
             ) : (
               <span className="bg-emerald-900/60 text-emerald-200 text-[10px] px-1.5 py-0.5 rounded">Saisie Ouverte</span>

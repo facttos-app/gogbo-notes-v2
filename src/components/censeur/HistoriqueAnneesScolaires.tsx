@@ -634,7 +634,7 @@ export const HistoriqueAnneesScolaires: React.FC<HistoriqueAnneesScolairesProps>
                     <div key={p.id} className="bg-white p-3 rounded-lg border border-slate-200 text-xs shadow-2xs">
                       <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
                         <span>{p.code}</span>
-                        {p.is_locked ? (
+                        {p?.is_locked ? (
                           <span className="text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 font-bold flex items-center space-x-1">
                             <Lock className="w-2.5 h-2.5" />
                             <span>Verrouillé</span>
@@ -940,7 +940,7 @@ export const HistoriqueAnneesScolaires: React.FC<HistoriqueAnneesScolairesProps>
                   <div key={p.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-2xs">
                     <div className="flex items-center justify-between text-xs text-slate-500 font-mono mb-2">
                       <span className="font-bold">{p.code}</span>
-                      {p.is_locked ? (
+                      {p?.is_locked ? (
                         <span className="text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 font-bold text-[10px] flex items-center space-x-1">
                           <Lock className="w-3 h-3" />
                           <span>Verrouillé (Lecture seule)</span>

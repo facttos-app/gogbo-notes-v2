@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAnnee } from '../../context/AnneeContext';
 import { storage } from '../../lib/storage';
@@ -8,7 +8,7 @@ import {
   calculerSyntheseMatiere,
   calculerClassementClasse
 } from '../../lib/appreciation';
-import { Eleve, Note, TypeEvaluation } from '../../types';
+import { Eleve, Note, TypeEvaluation, Classe, Matiere, AffectationPedagogique } from '../../types';
 import { 
   BookOpen, 
   Users, 
@@ -17,12 +17,21 @@ import {
   Save, 
   Award, 
   Lock, 
-  FileText,
-  Calculator,
-  RefreshCw,
-  CheckCheck,
-  Calendar
+  FileText, 
+  Calculator, 
+  RefreshCw, 
+  CheckCheck, 
+  Calendar,
+  Globe,
+  Eye,
+  ShieldCheck,
+  ShieldAlert,
+  Search,
+  Filter,
+  ClipboardCheck
 } from 'lucide-react';
+import { ModalEnregistrerPunition } from '../discipline/ModalEnregistrerPunition';
+import { AppelCoursSeance } from '../discipline/AppelCoursSeance';
 
 interface EspacePedagogiqueProps {
   onOpenBulletin?: (eleveId: string, classeId: string, periodeId: string) => void;
@@ -31,20 +40,54 @@ interface EspacePedagogiqueProps {
 type EvalInputKey = 'INTERROGATION_1' | 'INTERROGATION_2' | 'INTERROGATION_3' | 'DEVOIR_1' | 'DEVOIR_2';
 
 export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBulletin }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isCenseur, isConcepteur } = useAuth();
   const { selectedAnnee, isArchive } = useAnnee();
-  const affectations = storage.getAffectationsByProfile(currentUser?.id || '', selectedAnnee.libelle);
-  const periodes = storage.getPeriodes().filter((p) => p.annee_scolaire === selectedAnnee.libelle);
+
+  const allClasses = useMemo(() => storage.getClasses(), []);
+  const allMatieresList = useMemo(() => storage.getMatieres(), []);
+  const periodes = useMemo(
+    () => storage.getPeriodesByAnnee(selectedAnnee?.libelle),
+    [selectedAnnee?.libelle]
+  );
   const activePeriode = periodes.find((p) => p.is_active) || periodes[0] || storage.getActivePeriode();
 
   const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>(activePeriode?.id || '');
 
-  // Attribution sélectionnée pour l'année visualisée
-  const [selectedAffId, setSelectedAffId] = useState<string>(
-    affectations.length > 0 ? affectations[0].id : ''
+  // Synchroniser la période sélectionnée lors du changement d'année ou de périodes
+  useEffect(() => {
+    if (periodes.length > 0 && !periodes.some((p) => p.id === selectedPeriodeId)) {
+      const active = periodes.find((p) => p.is_active) || periodes[0];
+      if (active) setSelectedPeriodeId(active.id);
+    }
+  }, [periodes, selectedPeriodeId]);
+
+  // Attributions de cet enseignant pour l'année visualisée
+  const myAffectations = useMemo(
+    () => storage.getAffectationsByProfile(currentUser?.id || '', selectedAnnee.libelle),
+    [currentUser?.id, selectedAnnee.libelle]
   );
 
-  const [activeTab, setActiveTab] = useState<'saisie' | 'resultats'>('saisie');
+  // Toutes les attributions de l'année scolaire visualisée
+  const allYearAffectations = useMemo(
+    () => storage.getAffectations(selectedAnnee.libelle),
+    [selectedAnnee.libelle]
+  );
+
+  // Mode de travail : 'MES_ATTRIBUTIONS' (si l'enseignant a des classes) ou 'VISION_GLOBALE' (toutes les 28 classes)
+  const [viewMode, setViewMode] = useState<'MES_ATTRIBUTIONS' | 'VISION_GLOBALE'>(
+    myAffectations.length > 0 ? 'MES_ATTRIBUTIONS' : 'VISION_GLOBALE'
+  );
+
+  // Attribution sélectionnée dans "Mes classes"
+  const [selectedAffId, setSelectedAffId] = useState<string>(
+    myAffectations.length > 0 ? myAffectations[0].id : ''
+  );
+
+  // Pour la vision globale : sélection libre parmi les 28 classes et matières
+  const [globalClasseId, setGlobalClasseId] = useState<string>(allClasses[0]?.id || '');
+  const [globalMatiereId, setGlobalMatiereId] = useState<string>(allMatieresList[0]?.id || '');
+
+  const [activeTab, setActiveTab] = useState<'saisie' | 'appel' | 'resultats'>('saisie');
 
   // État de saisie des notes en cours (clé : `${eleveId}_${type}` -> valeur string)
   const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
@@ -52,40 +95,86 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [isEditingCoef, setIsEditingCoef] = useState(false);
+  const [isPunitionModalOpen, setIsPunitionModalOpen] = useState(false);
   const [newCoefValue, setNewCoefValue] = useState<number>(2);
 
-  const currentAff = affectations.find((a) => a.id === selectedAffId) || affectations[0];
-  const classe = currentAff ? storage.getClasseById(currentAff.classe_id) : undefined;
-  const matiere = currentAff ? storage.getMatiereById(currentAff.matiere_id) : undefined;
-  const periode = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0];
-
-  React.useEffect(() => {
-    if (affectations.length > 0) {
-      if (!affectations.some((a) => a.id === selectedAffId)) {
-        setSelectedAffId(affectations[0].id);
+  // Synchronisation de la sélection par défaut en mode "Mes attributions"
+  useEffect(() => {
+    if (myAffectations.length > 0) {
+      if (!myAffectations.some((a) => a.id === selectedAffId)) {
+        setSelectedAffId(myAffectations[0].id);
       }
     } else {
       setSelectedAffId('');
+      setViewMode('VISION_GLOBALE');
     }
-  }, [affectations, selectedAffId]);
+  }, [myAffectations, selectedAffId]);
+
+  // Détermination de l'attribution, classe et matière actives selon le mode
+  const currentAff: AffectationPedagogique | undefined = useMemo(() => {
+    if (viewMode === 'MES_ATTRIBUTIONS') {
+      return myAffectations.find((a) => a.id === selectedAffId) || myAffectations[0];
+    }
+    // Mode Vision Globale : chercher l'attribution officielle de la classe et matière
+    return (
+      allYearAffectations.find(
+        (a) => a.classe_id === globalClasseId && a.matiere_id === globalMatiereId && a.statut === 'ACTIF'
+      ) ||
+      allYearAffectations.find(
+        (a) => a.classe_id === globalClasseId && a.matiere_id === globalMatiereId
+      )
+    );
+  }, [viewMode, myAffectations, selectedAffId, allYearAffectations, globalClasseId, globalMatiereId]);
+
+  const classe: Classe | undefined = useMemo(() => {
+    if (viewMode === 'MES_ATTRIBUTIONS') {
+      return currentAff ? storage.getClasseById(currentAff.classe_id) : undefined;
+    }
+    return storage.getClasseById(globalClasseId) || allClasses[0];
+  }, [viewMode, currentAff, globalClasseId, allClasses]);
+
+  const matiere: Matiere | undefined = useMemo(() => {
+    if (viewMode === 'MES_ATTRIBUTIONS') {
+      return currentAff ? storage.getMatiereById(currentAff.matiere_id) : undefined;
+    }
+    return storage.getMatiereById(globalMatiereId) || allMatieresList[0];
+  }, [viewMode, currentAff, globalMatiereId, allMatieresList]);
+
+  const periode = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0] || activePeriode;
+
+  // Enseignant titulaire de l'attribution visualisée
+  const assignedTeacher = useMemo(() => {
+    if (!currentAff) return undefined;
+    return storage.getProfileById(currentAff.profile_id);
+  }, [currentAff]);
+
+  // Détermination stricte des droits d'édition des notes :
+  // Seul l'enseignant titulaire ou le Censeur/Concepteur peut saisir/modifier les notes
+  // En mode consultation d'une classe non attribuée, c'est en LECTURE SEULE
+  const isAssignedTeacher = currentAff && currentAff.profile_id === currentUser?.id;
+  const isManager = isCenseur || isConcepteur || currentUser?.role === 'CENSEUR' || currentUser?.role === 'CONCEPTEUR';
+  const canEdit = !isArchive && !periode?.is_locked && (isAssignedTeacher || isManager);
+
+  // Professeur Principal de la classe pour l'utilisateur connecté
+  const ppClasse = currentUser ? storage.getClasseProfesseurPrincipal(currentUser.id, selectedAnnee.libelle) : undefined;
 
   // Noms des matières enseignées par cet enseignant
   const teacherDisciplines = Array.from(
     new Set(
-      affectations
+      myAffectations
         .map((a) => storage.getMatiereById(a.matiere_id)?.nom)
         .filter(Boolean)
     )
   ).join(' • ');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (matiere) {
       setNewCoefValue(matiere.coefficient);
     }
   }, [matiere?.id, matiere?.coefficient]);
 
   const handleSaveTeacherCoef = async () => {
-    if (!currentUser || !matiere || !currentAff) return;
+    if (!currentUser || !matiere || (!isAssignedTeacher && !isManager)) return;
     if (isArchive) {
       setStatusMessage({ type: 'error', text: 'Action refusée en consultation d’archive historique.' });
       return;
@@ -100,7 +189,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
       triggerRecalculationVisual();
       setStatusMessage({
         type: 'success',
-        text: `✓ Coefficient de votre discipline "${matiere.nom}" mis à jour (${newCoefValue}) pour vos attributions.`,
+        text: `✓ Coefficient de votre discipline "${matiere.nom}" mis à jour (${newCoefValue}).`,
       });
     } catch (e: unknown) {
       setStatusMessage({
@@ -114,9 +203,19 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
   const eleves: Eleve[] = classe ? storage.getElevesByClasse(classe.id, selectedAnnee.libelle) : [];
 
   // Notes existantes pour cette attribution et cette période
-  const existingNotes: Note[] = currentAff
-    ? storage.getNotesByAffectationAndPeriode(currentAff.id, selectedPeriodeId)
-    : [];
+  const existingNotes: Note[] = useMemo(() => {
+    if (!classe || !matiere || !selectedPeriodeId) return [];
+    if (currentAff) {
+      return storage.getNotesByAffectationAndPeriode(currentAff.id, selectedPeriodeId);
+    }
+    // Trouver toutes les attributions correspondantes
+    const matchingAffIds = new Set(
+      allYearAffectations
+        .filter((a) => a.classe_id === classe.id && a.matiere_id === matiere.id)
+        .map((a) => a.id)
+    );
+    return storage.getNotes().filter((n) => matchingAffIds.has(n.affectation_id) && n.periode_id === selectedPeriodeId);
+  }, [classe?.id, matiere?.id, selectedPeriodeId, currentAff, allYearAffectations]);
 
   // Récupérer la valeur actuelle d'un champ d'évaluation (I1, I2, I3, D1, D2)
   const getInputValue = (eleveId: string, type: EvalInputKey): string => {
@@ -127,7 +226,6 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
     const note = existingNotes.find((n) => {
       if (n.eleve_id !== eleveId) return false;
       if (n.type_evaluation === type) return true;
-      // Compatibilité rétroactive pour ancienne étiquette INTERROGATION vers INTERROGATION_1
       if (type === 'INTERROGATION_1' && n.type_evaluation === 'INTERROGATION') return true;
       return false;
     });
@@ -135,6 +233,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
   };
 
   const handleInputChange = (eleveId: string, type: EvalInputKey, val: string) => {
+    if (!canEdit) return;
     const cleaned = val.replace(',', '.');
     const key = `${eleveId}_${type}`;
     setNoteInputs((prev) => ({ ...prev, [key]: cleaned }));
@@ -147,9 +246,9 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
     }, 250);
   };
 
-  // Enregistrer toutes les notes (I1, I2, I3, D1, D2) pour un élève
+  // Enregistrer toutes les notes pour un élève
   const handleSaveStudentRow = (eleve: Eleve) => {
-    if (!currentUser || !currentAff || !matiere) return;
+    if (!currentUser || !currentAff || !matiere || !canEdit) return;
     setStatusMessage(null);
 
     const evalTypes: EvalInputKey[] = [
@@ -205,7 +304,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
   // Enregistrer toutes les notes saisies pour toute la classe
   const handleSaveAllNotes = () => {
-    if (!currentUser || !currentAff) return;
+    if (!currentUser || !currentAff || !canEdit) return;
     setStatusMessage(null);
 
     const evalTypes: EvalInputKey[] = [
@@ -264,28 +363,10 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
     }
   };
 
-  if (affectations.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-6 sm:p-10 text-center max-w-2xl mx-auto my-8">
-        <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Aucune attribution de classe active</h2>
-        <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-          Votre compte (<strong>{currentUser?.prenom} {currentUser?.nom}</strong>, rôle : {currentUser?.role}) 
-          n'a pas encore d'attribution de classe ou de matière pour l'année scolaire <strong>{selectedAnnee.libelle}</strong>.
-        </p>
-        <p className="text-xs text-slate-600 bg-amber-50 p-3 rounded-lg border border-amber-200 leading-relaxed">
-          Le Censeur des Études est seul responsable de l'attribution des classes et matières. Dès que le Censeur vous aura attribué vos classes, elles apparaîtront automatiquement ici pour vous permettre de saisir les notes.
-        </p>
-      </div>
-    );
-  }
-
-  // Calcul du classement et bulletins complets pour les résultats
+  // Calcul du classement et bulletins complets pour les résultats de la classe
   const allMatieres = storage.getMatieres();
   const allNotes = storage.getNotes();
-  const allAffectations = storage.getAffectations();
+  const allAffectations = storage.getAffectations(selectedAnnee.libelle);
 
   const { classement, bulletinsMap } = classe
     ? calculerClassementClasse(classe, eleves, periode, allMatieres, allNotes, allAffectations)
@@ -297,10 +378,15 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-slate-900 text-white rounded-xl p-4 sm:p-6 shadow-md border border-emerald-700/50">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="bg-emerald-500/20 text-emerald-300 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-500/40">
-                Espace Pédagogique — Attributions de classe
+                Espace Pédagogique — Consultation & Saisie Scolaire
               </span>
+              {ppClasse && (
+                <span className="bg-indigo-500/30 text-indigo-200 text-xs px-2.5 py-0.5 rounded-full font-bold border border-indigo-400/40 flex items-center space-x-1">
+                  <span>⭐ Professeur Principal ({ppClasse.nom})</span>
+                </span>
+              )}
               <span className="text-slate-300 text-xs">• Année {selectedAnnee.libelle}</span>
               {isArchive && (
                 <span className="bg-amber-500 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
@@ -317,7 +403,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
               )}
             </h2>
             <p className="text-xs sm:text-sm text-emerald-200/90 mt-0.5">
-              Saisie séparée des évaluations pour vos classes attribuées par le Censeur • Année {selectedAnnee.libelle}
+              Vision globale de l'ensemble des 28 classes et saisie pour vos attributions officielles • CEG GOGBO
             </p>
           </div>
 
@@ -328,61 +414,201 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
               aria-label="Sélectionner la période scolaire"
               value={selectedPeriodeId}
               onChange={(e) => setSelectedPeriodeId(e.target.value)}
-              className="bg-slate-800 text-white font-medium rounded px-2.5 py-1.5 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              className="bg-slate-800 text-white font-medium rounded px-2.5 py-1.5 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
             >
-              {periodes.map((p) => (
+              {periodes.filter(Boolean).map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.nom} {p.is_locked ? '(Verrouillé)' : '(Ouvert)'}
+                  {p.nom || p.code} {p?.is_locked ? '(Verrouillé)' : '(Ouvert)'}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Mes classes attribuées */}
-        <div className="mt-5 pt-4 border-t border-emerald-700/40">
-          <div className="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2.5 flex items-center space-x-1.5">
-            <BookOpen className="w-4 h-4 text-amber-400" />
-            <span>Mes classes ({affectations.length}) :</span>
+        {/* Bascule de mode : Mes attributions VS Vision Globale (28 Classes) */}
+        <div className="mt-5 pt-4 border-t border-emerald-700/40 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-2 bg-emerald-950/60 p-1 rounded-xl border border-emerald-700/50">
+            {myAffectations.length > 0 && (
+              <button
+                id="btn-mode-mes-attributions"
+                onClick={() => {
+                  setViewMode('MES_ATTRIBUTIONS');
+                  setNoteInputs({});
+                  setStatusMessage(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                  viewMode === 'MES_ATTRIBUTIONS'
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'text-emerald-200 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Mes classes attribuées ({myAffectations.length})</span>
+              </button>
+            )}
+
+            <button
+              id="btn-mode-vision-globale"
+              onClick={() => {
+                setViewMode('VISION_GLOBALE');
+                setNoteInputs({});
+                setStatusMessage(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+                viewMode === 'VISION_GLOBALE'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-emerald-200 hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>Vision Globale (Toutes les 28 Classes)</span>
+            </button>
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
-            {affectations.map((aff) => {
-              const cls = storage.getClasseById(aff.classe_id);
-              const mat = storage.getMatiereById(aff.matiere_id);
-              const isSelected = aff.id === selectedAffId;
-              return (
-                <button
-                  key={aff.id}
-                  id={`btn-select-aff-${aff.id}`}
-                  onClick={() => {
-                    setSelectedAffId(aff.id);
-                    setNoteInputs({});
-                    setStatusMessage(null);
-                  }}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-amber-400 text-slate-950 font-black shadow-md ring-2 ring-white/60 scale-[1.02]'
-                      : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-100 border border-emerald-700/60 shadow-xs'
-                  }`}
-                >
-                  <span className="text-sm font-black">{cls?.nom}</span>
-                  <span className="opacity-60">—</span>
-                  <span className="font-semibold">{mat?.nom}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    isSelected ? 'bg-slate-950 text-amber-300' : 'bg-emerald-800 text-emerald-200'
-                  }`}>
-                    {aff.heures_hebdo}h
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsPunitionModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-600 text-white shadow-xs"
+              title="Consigner une punition pour n'importe quel élève du collège"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-200" />
+              <span>+ Punir un apprenant (28 Classes)</span>
+            </button>
+
+            <div className="text-[11px] text-emerald-200/80 font-medium hidden sm:block">
+              {viewMode === 'MES_ATTRIBUTIONS' ? (
+                <span>Saisie & modification directe de vos notes de cours</span>
+              ) : (
+                <span>Consultation libre de toutes les classes (6ème à Terminale)</span>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Boutons de sélection rapide selon le mode */}
+        {viewMode === 'MES_ATTRIBUTIONS' ? (
+          <div className="mt-3">
+            <div className="flex flex-wrap gap-2.5">
+              {myAffectations.map((aff) => {
+                const cls = storage.getClasseById(aff.classe_id);
+                const mat = storage.getMatiereById(aff.matiere_id);
+                const isSelected = aff.id === selectedAffId;
+                return (
+                  <button
+                    key={aff.id}
+                    id={`btn-select-aff-${aff.id}`}
+                    onClick={() => {
+                      setSelectedAffId(aff.id);
+                      setNoteInputs({});
+                      setStatusMessage(null);
+                    }}
+                    className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-md ring-2 ring-white/60 scale-[1.02]'
+                        : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-100 border border-emerald-700/60 shadow-xs'
+                    }`}
+                  >
+                    <span className="text-sm font-black">{cls?.nom}</span>
+                    <span className="opacity-60">—</span>
+                    <span className="font-semibold">{mat?.nom}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      isSelected ? 'bg-slate-950 text-amber-300' : 'bg-emerald-800 text-emerald-200'
+                    }`}>
+                      {aff.heures_hebdo}h
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Sélecteur libre de la classe et matière pour la Vision Globale */
+          <div className="mt-3 p-3 bg-emerald-950/80 rounded-xl border border-emerald-700/60 flex flex-wrap items-center gap-3">
+            {/* Sélecteur de Classe parmi les 28 */}
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="text-amber-300 font-bold flex items-center space-x-1">
+                <Users className="w-3.5 h-3.5" />
+                <span>Classe (28) :</span>
+              </span>
+              <select
+                id="select-vision-globale-classe"
+                aria-label="Sélectionner la classe pour la vision globale"
+                value={globalClasseId}
+                onChange={(e) => {
+                  setGlobalClasseId(e.target.value);
+                  setNoteInputs({});
+                  setStatusMessage(null);
+                }}
+                className="bg-slate-900 text-white font-bold rounded-lg px-3 py-1.5 border border-emerald-600 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer text-xs"
+              >
+                {allClasses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nom} ({storage.getElevesByClasse(c.id, selectedAnnee.libelle).length} élèves)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sélecteur de Discipline */}
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="text-amber-300 font-bold flex items-center space-x-1">
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Discipline :</span>
+              </span>
+              <select
+                id="select-vision-globale-matiere"
+                aria-label="Sélectionner la matière pour la vision globale"
+                value={globalMatiereId}
+                onChange={(e) => {
+                  setGlobalMatiereId(e.target.value);
+                  setNoteInputs({});
+                  setStatusMessage(null);
+                }}
+                className="bg-slate-900 text-white font-bold rounded-lg px-3 py-1.5 border border-emerald-600 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer text-xs"
+              >
+                {allMatieresList.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nom} (Coef. {m.coefficient})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Indicateur d'attribution pour cette classe/matière */}
+            <div className="ml-auto text-xs flex items-center space-x-2">
+              <span className="text-emerald-200">
+                Titulaire :{' '}
+                <strong className="text-white">
+                  {assignedTeacher ? `${assignedTeacher.nom} ${assignedTeacher.prenom}` : 'Non attribué'}
+                </strong>
+              </span>
+              {canEdit ? (
+                <span className="bg-emerald-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                  ✓ Saisie autorisée
+                </span>
+              ) : (
+                <span className="bg-indigo-900 text-indigo-200 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-700 flex items-center space-x-1">
+                  <Eye className="w-3 h-3 text-indigo-300" />
+                  <span>Consultation seule</span>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Détail de l'attribution de classe active */}
-      {currentAff && classe && matiere && (
+      {/* Message informatif si l'utilisateur n'a pas encore de classes assignées */}
+      {myAffectations.length === 0 && (
+        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start space-x-2.5 shadow-2xs">
+          <Globe className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <strong>Mode Consultation Globale Activé :</strong> Votre compte n'a pas encore de classe assignée pour la saisie de notes par le Censeur, mais vous bénéficiez d'une visibilité intégrale sur les <strong>28 classes</strong>, les élèves, les résultats et les bulletins de l'établissement ci-dessous.
+          </div>
+        </div>
+      )}
+
+      {/* Détail de la classe et matière active */}
+      {classe && matiere && (
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
           {/* Header de la vue classe */}
           <div className="px-4 sm:px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -391,9 +617,16 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                 {classe.nom.split(' ')[0]}
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                  {classe.nom} — {matiere.nom}
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                    {classe.nom} — {matiere.nom}
+                  </h3>
+                  {!canEdit && (
+                    <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded border border-indigo-200">
+                      Lecture seule
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span className="flex items-center space-x-1">
                     <Users className="w-3.5 h-3.5" />
@@ -402,7 +635,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   <span>•</span>
                   <span className="inline-flex items-center space-x-1.5">
                     <span>Coefficient : <strong className="text-slate-900">{matiere.coefficient}</strong></span>
-                    {!isArchive && (
+                    {canEdit && !isArchive && (
                       <button
                         onClick={() => setIsEditingCoef(!isEditingCoef)}
                         className="text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded font-bold cursor-pointer"
@@ -422,7 +655,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   </span>
                 </div>
 
-                {isEditingCoef && (
+                {isEditingCoef && canEdit && (
                   <div className="mt-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg flex flex-wrap items-center gap-2 text-xs">
                     <span className="font-bold text-indigo-900">Nouveau Coefficient pour {matiere.nom} :</span>
                     <input
@@ -450,23 +683,35 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
               </div>
             </div>
 
-            {/* Navigation Saisie vs Résultats */}
+            {/* Navigation Saisie vs Appel vs Résultats */}
             <div className="flex bg-slate-200/80 p-1 rounded-lg text-xs font-medium w-full sm:w-auto">
               <button
                 id="btn-tab-saisie-notes"
                 onClick={() => setActiveTab('saisie')}
-                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-md transition-all ${
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-md transition-all cursor-pointer ${
                   activeTab === 'saisie'
                     ? 'bg-white text-emerald-800 font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Saisie des Notes (I1, I2, I3, D1, D2)
+                {canEdit ? 'Saisie des Notes (I1, I2, I3, D1, D2)' : 'Évaluations de la matière (Notes)'}
+              </button>
+              <button
+                id="btn-tab-appel-cours"
+                onClick={() => setActiveTab('appel')}
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-md transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
+                  activeTab === 'appel'
+                    ? 'bg-white text-emerald-800 font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ClipboardCheck className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Faire l'appel de cours</span>
               </button>
               <button
                 id="btn-tab-consultation-resultats"
                 onClick={() => setActiveTab('resultats')}
-                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-md transition-all ${
+                className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-md transition-all cursor-pointer ${
                   activeTab === 'resultats'
                     ? 'bg-white text-emerald-800 font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -514,16 +759,29 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
           {activeTab === 'saisie' ? (
             <div className="p-4 sm:p-6 space-y-4">
               {/* Alerte si la période est verrouillée */}
-              {periode.is_locked && (
+              {periode?.is_locked && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center space-x-2">
                   <Lock className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>
-                    La saisie des notes pour <strong>{periode.nom}</strong> est actuellement clôturée par le Censeur des Études.
+                    La saisie des notes pour <strong>{periode?.nom || 'cette période'}</strong> est actuellement clôturée par le Censeur des Études.
                   </span>
                 </div>
               )}
 
-              {/* Barre d'outils et bouton Enregistrer Toute la Classe */}
+              {/* Notice si en mode consultation seule */}
+              {!canEdit && !periode?.is_locked && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>
+                      <strong>Mode Consultation en Lecture Seule :</strong> Vous consultez les notes saisies par l'enseignant titulaire (<strong>{assignedTeacher ? `${assignedTeacher.nom} ${assignedTeacher.prenom}` : 'Non attribué'}</strong>).
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-semibold uppercase">Consultation</span>
+                </div>
+              )}
+
+              {/* Barre d'outils et bouton Enregistrer Toute la Classe (si canEdit) */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                 <div className="flex items-center space-x-2 text-xs text-slate-700">
                   <Calculator className="w-4 h-4 text-emerald-600" />
@@ -532,11 +790,11 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   </span>
                 </div>
 
-                {!periode.is_locked && (
+                {canEdit && (
                   <button
                     id="btn-save-all-notes"
                     onClick={handleSaveAllNotes}
-                    className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-xs"
+                    className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-xs cursor-pointer"
                   >
                     <CheckCheck className="w-4 h-4" />
                     <span>Enregistrer toutes les notes de la classe</span>
@@ -650,56 +908,74 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
                           {/* Interrogation 1 */}
                           <td className="px-1.5 py-2 text-center bg-blue-50/20 border-x border-blue-100">
-                            <input
-                              id={`input-i1-${eleve.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              disabled={periode.is_locked}
-                              placeholder="—"
-                              value={vI1Str}
-                              onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_1', e.target.value)}
-                              className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                nI1 !== null && (nI1 < 0 || nI1 > 20)
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-slate-300 bg-white text-slate-900'
-                              } ${periode.is_locked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                            />
+                            {canEdit ? (
+                              <input
+                                id={`input-i1-${eleve.id}`}
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!canEdit}
+                                placeholder="—"
+                                value={vI1Str}
+                                onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_1', e.target.value)}
+                                className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                  nI1 !== null && (nI1 < 0 || nI1 > 20)
+                                    ? 'border-red-500 bg-red-50 text-red-700'
+                                    : 'border-slate-300 bg-white text-slate-900'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-bold text-xs text-slate-800">
+                                {nI1 !== null ? nI1 : '—'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Interrogation 2 */}
                           <td className="px-1.5 py-2 text-center bg-blue-50/20 border-r border-blue-100">
-                            <input
-                              id={`input-i2-${eleve.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              disabled={periode.is_locked}
-                              placeholder="—"
-                              value={vI2Str}
-                              onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_2', e.target.value)}
-                              className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                nI2 !== null && (nI2 < 0 || nI2 > 20)
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-slate-300 bg-white text-slate-900'
-                              } ${periode.is_locked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                            />
+                            {canEdit ? (
+                              <input
+                                id={`input-i2-${eleve.id}`}
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!canEdit}
+                                placeholder="—"
+                                value={vI2Str}
+                                onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_2', e.target.value)}
+                                className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                  nI2 !== null && (nI2 < 0 || nI2 > 20)
+                                    ? 'border-red-500 bg-red-50 text-red-700'
+                                    : 'border-slate-300 bg-white text-slate-900'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-bold text-xs text-slate-800">
+                                {nI2 !== null ? nI2 : '—'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Interrogation 3 */}
                           <td className="px-1.5 py-2 text-center bg-blue-50/20 border-r border-blue-100">
-                            <input
-                              id={`input-i3-${eleve.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              disabled={periode.is_locked}
-                              placeholder="—"
-                              value={vI3Str}
-                              onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_3', e.target.value)}
-                              className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                nI3 !== null && (nI3 < 0 || nI3 > 20)
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-slate-300 bg-white text-slate-900'
-                              } ${periode.is_locked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                            />
+                            {canEdit ? (
+                              <input
+                                id={`input-i3-${eleve.id}`}
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!canEdit}
+                                placeholder="—"
+                                value={vI3Str}
+                                onChange={(e) => handleInputChange(eleve.id, 'INTERROGATION_3', e.target.value)}
+                                className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                  nI3 !== null && (nI3 < 0 || nI3 > 20)
+                                    ? 'border-red-500 bg-red-50 text-red-700'
+                                    : 'border-slate-300 bg-white text-slate-900'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-bold text-xs text-slate-800">
+                                {nI3 !== null ? nI3 : '—'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Moyenne Interrogations */}
@@ -715,38 +991,50 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
                           {/* Devoir 1 */}
                           <td className="px-1.5 py-2 text-center bg-emerald-50/20 border-r border-emerald-100">
-                            <input
-                              id={`input-d1-${eleve.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              disabled={periode.is_locked}
-                              placeholder="—"
-                              value={vD1Str}
-                              onChange={(e) => handleInputChange(eleve.id, 'DEVOIR_1', e.target.value)}
-                              className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
-                                nD1 !== null && (nD1 < 0 || nD1 > 20)
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-slate-300 bg-white text-slate-900'
-                              } ${periode.is_locked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                            />
+                            {canEdit ? (
+                              <input
+                                id={`input-d1-${eleve.id}`}
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!canEdit}
+                                placeholder="—"
+                                value={vD1Str}
+                                onChange={(e) => handleInputChange(eleve.id, 'DEVOIR_1', e.target.value)}
+                                className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                  nD1 !== null && (nD1 < 0 || nD1 > 20)
+                                    ? 'border-red-500 bg-red-50 text-red-700'
+                                    : 'border-slate-300 bg-white text-slate-900'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-bold text-xs text-slate-800">
+                                {nD1 !== null ? nD1 : '—'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Devoir 2 */}
                           <td className="px-1.5 py-2 text-center bg-emerald-50/20 border-r border-emerald-100">
-                            <input
-                              id={`input-d2-${eleve.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              disabled={periode.is_locked}
-                              placeholder="—"
-                              value={vD2Str}
-                              onChange={(e) => handleInputChange(eleve.id, 'DEVOIR_2', e.target.value)}
-                              className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
-                                nD2 !== null && (nD2 < 0 || nD2 > 20)
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-slate-300 bg-white text-slate-900'
-                              } ${periode.is_locked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                            />
+                            {canEdit ? (
+                              <input
+                                id={`input-d2-${eleve.id}`}
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!canEdit}
+                                placeholder="—"
+                                value={vD2Str}
+                                onChange={(e) => handleInputChange(eleve.id, 'DEVOIR_2', e.target.value)}
+                                className={`w-14 text-center font-bold text-xs py-1 px-1 rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                  nD2 !== null && (nD2 < 0 || nD2 > 20)
+                                    ? 'border-red-500 bg-red-50 text-red-700'
+                                    : 'border-slate-300 bg-white text-slate-900'
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-bold text-xs text-slate-800">
+                                {nD2 !== null ? nD2 : '—'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Moyenne Matière */}
@@ -784,19 +1072,26 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
                           {/* Action individuelle */}
                           <td className="px-2 py-2 text-right whitespace-nowrap">
-                            <button
-                              id={`btn-save-row-${eleve.id}`}
-                              disabled={periode.is_locked}
-                              onClick={() => handleSaveStudentRow(eleve)}
-                              className={`p-1.5 rounded text-white font-medium text-xs transition-colors ${
-                                periode.is_locked
-                                  ? 'bg-slate-300 cursor-not-allowed'
-                                  : 'bg-emerald-600 hover:bg-emerald-700'
-                              }`}
-                              title="Enregistrer les notes de cet élève"
-                            >
-                              <Save className="w-3.5 h-3.5" />
-                            </button>
+                            {canEdit ? (
+                              <button
+                                id={`btn-save-row-${eleve.id}`}
+                                disabled={!canEdit}
+                                onClick={() => handleSaveStudentRow(eleve)}
+                                className="p-1.5 rounded text-white font-medium text-xs transition-colors bg-emerald-600 hover:bg-emerald-700 cursor-pointer"
+                                title="Enregistrer les notes de cet élève"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => onOpenBulletin && onOpenBulletin(eleve.id, classe.id, periode.id)}
+                                className="inline-flex items-center space-x-1 px-2 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 rounded font-medium text-[10px] cursor-pointer"
+                                title="Consulter le bulletin de cet apprenant"
+                              >
+                                <FileText className="w-3 h-3 text-emerald-600" />
+                                <span>Bulletin</span>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -804,6 +1099,13 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : activeTab === 'appel' ? (
+            <div className="p-4 sm:p-6">
+              <AppelCoursSeance 
+                restrictToTeacher={!isCenseur && !isConcepteur} 
+                initialClasseId={classe.id} 
+              />
             </div>
           ) : (
             /* Consultation détaillée des résultats de la matière et moyennes générales */
@@ -815,8 +1117,12 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                     <span>Synthèse complète : {matiere.nom} — {classe.nom} ({periode.nom})</span>
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Détail des 3 interrogations, devoirs, moyennes et rangs au CEG GOGBO
+                    Palmarès de la classe, moyennes générales et appréciations officielles du CEG GOGBO
                   </p>
+                </div>
+
+                <div className="text-xs text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
+                  Effectif évalué : <strong>{classement.filter(c => c.moyenne_generale !== null).length} / {eleves.length}</strong> apprenants
                 </div>
               </div>
 
@@ -895,7 +1201,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                             <button
                               id={`btn-open-bulletin-${item.eleve_id}`}
                               onClick={() => onOpenBulletin && onOpenBulletin(item.eleve_id, classe.id, periode.id)}
-                              className="inline-flex items-center space-x-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-medium text-[11px]"
+                              className="inline-flex items-center space-x-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-medium text-[11px] cursor-pointer"
                               title="Générer le bulletin scolaire"
                             >
                               <FileText className="w-3.5 h-3.5" />
@@ -912,6 +1218,16 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
           )}
         </div>
       )}
+
+      {/* Modal punition ouvert à tout enseignant */}
+      <ModalEnregistrerPunition
+        isOpen={isPunitionModalOpen}
+        onClose={() => setIsPunitionModalOpen(false)}
+        onSuccess={() => {
+          setStatusMessage({ type: 'success', text: 'Punition scolaire enregistrée avec succès.' });
+          setTimeout(() => setStatusMessage(null), 3000);
+        }}
+      />
     </div>
   );
 };

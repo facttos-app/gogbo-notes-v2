@@ -47,9 +47,10 @@ const MOTIFS_SUGGESTIONS = [
 ];
 
 export const PresenceEnseignants: React.FC = () => {
-  const { currentUser, isCenseur, isConcepteur, isDirecteur } = useAuth();
+  const { currentUser, isCenseur } = useAuth();
   const { anneeActive } = useAnnee();
-  const canManage = isCenseur || isConcepteur || isDirecteur;
+  // Seul le Censeur, selon ses attributions officielles, dispose des droits d'écriture et de modification.
+  const canManage = currentUser?.role === 'CENSEUR' || isCenseur;
 
   const currentAnnee = anneeActive?.libelle || storage.getParametres().annee_academique || '2026–2027';
 
@@ -356,17 +357,8 @@ export const PresenceEnseignants: React.FC = () => {
 
   const anneesDisponibles = storage.getAnneesScolaires();
 
-  if (!canManage) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-800 p-6 rounded-xl text-center">
-        <AlertTriangle className="w-10 h-10 mx-auto text-red-600 mb-2" />
-        <h2 className="text-lg font-bold">Accès Réservé au Censeur</h2>
-        <p className="text-sm mt-1">
-          Seul le Censeur ou la Direction Pédagogique est autorisé à saisir et superviser la présence journalière des enseignants.
-        </p>
-      </div>
-    );
-  }
+  // Si l'utilisateur n'a pas les droits de gestion et se trouvait sur le formulaire de saisie, on le redirige vers la consultation journalière
+  const currentTabSafe = (!canManage && activeTab === 'formulaire') ? 'journee' : activeTab;
 
   return (
     <div className="space-y-6">
@@ -375,8 +367,10 @@ export const PresenceEnseignants: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="bg-emerald-400 text-slate-950 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                Module Direction Pédagogique
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                canManage ? 'bg-emerald-400 text-slate-950' : 'bg-sky-400 text-slate-950'
+              }`}>
+                {canManage ? 'Espace Censeur — Saisie & Gestion' : 'Consultation — Lecture Seule'}
               </span>
               <span className="text-emerald-300 text-xs">• Année {selectedAnnee}</span>
             </div>
@@ -385,8 +379,10 @@ export const PresenceEnseignants: React.FC = () => {
               <span>PRÉSENCE JOURNALIÈRE DES ENSEIGNANTS</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
-              Enregistrement quotidien, gestion des retards, absences et permissions du corps professoral du CEG GOGBO.
-              Matières déduites exclusivement des attributions de classe réelles.
+              {canManage 
+                ? "Enregistrement quotidien, gestion des retards, absences et permissions du corps professoral du CEG GOGBO. Matières issues exclusivement des attributions réelles."
+                : "Consultation officielle du journal de présence des enseignants en lecture seule. Données certifiées par la Direction Pédagogique du CEG GOGBO."
+              }
             </p>
           </div>
 
@@ -395,39 +391,66 @@ export const PresenceEnseignants: React.FC = () => {
             <button
               onClick={() => setActiveTab('journee')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === 'journee'
+                currentTabSafe === 'journee'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Pointage du Jour</span>
+              <span>{canManage ? 'Pointage du Jour' : 'Pointage du Jour (Consultation)'}</span>
             </button>
-            <button
-              onClick={() => setActiveTab('formulaire')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === 'formulaire'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-              }`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Saisie Détaillée</span>
-            </button>
+            {canManage && (
+              <button
+                onClick={() => setActiveTab('formulaire')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
+                  currentTabSafe === 'formulaire'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Saisie Détaillée</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('historique')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === 'historique'
+                currentTabSafe === 'historique'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              <span>Historique & Stats</span>
+              <span>{canManage ? 'Historique & Stats' : 'Historique & Registre'}</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Bannière informative Mode Lecture Seule pour tous les non-Censeurs */}
+      {!canManage && (
+        <div className="p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-sky-100 rounded-lg text-sky-700 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-sky-950 flex items-center space-x-2">
+                <span>Journal en Lecture Seule</span>
+                <span className="text-[10px] bg-sky-200 text-sky-800 px-1.5 py-0.5 rounded font-bold uppercase">
+                  {currentUser?.role || 'Utilisateur'}
+                </span>
+              </div>
+              <div className="text-[11px] text-sky-800 mt-0.5">
+                Vous avez un accès complet à la consultation du journal de présence des enseignants, à la recherche et aux statistiques. Seul le <strong>Censeur</strong> est habilité à enregistrer ou modifier les présences.
+              </div>
+            </div>
+          </div>
+          <span className="shrink-0 text-[10px] font-bold text-sky-700 bg-white border border-sky-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            Aucune modification autorisée
+          </span>
+        </div>
+      )}
 
       {/* Message de notification / feedback */}
       {feedback && (
@@ -510,19 +533,21 @@ export const PresenceEnseignants: React.FC = () => {
               </div>
             </div>
 
-            {/* Action groupée */}
+            {/* Action groupée - Réservée au Censeur */}
             <div className="flex items-center space-x-2 w-full md:w-auto justify-between md:justify-end">
               <span className="text-xs text-slate-500 hidden sm:inline">
                 {dailyStats.pointes} / {dailyStats.totalEnseignants} pointés
               </span>
-              <button
-                onClick={handleMarquerTousPresents}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-xs cursor-pointer"
-                title="Marquer automatiquement tous les enseignants non encore pointés aujourd'hui comme Présents"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Marquer tous les non-pointés comme Présents</span>
-              </button>
+              {canManage && (
+                <button
+                  onClick={handleMarquerTousPresents}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  title="Marquer automatiquement tous les enseignants non encore pointés aujourd'hui comme Présents"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Marquer tous les non-pointés comme Présents</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -676,119 +701,128 @@ export const PresenceEnseignants: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Boutons d'actions de pointage (Touch-friendly) */}
-                      <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto justify-end">
-                        {/* Bouton Présent */}
-                        <button
-                          onClick={() => handleQuickPoint(ens, 'PRESENT')}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
-                            isPresent
-                              ? 'bg-emerald-600 text-white shadow-xs'
-                              : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                          }`}
-                          title="Pointer Présent"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Présent</span>
-                        </button>
+                      {/* Boutons d'actions de pointage (Réservés exclusivement au Censeur) */}
+                      {canManage ? (
+                        <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto justify-end">
+                          {/* Bouton Présent */}
+                          <button
+                            onClick={() => handleQuickPoint(ens, 'PRESENT')}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
+                              isPresent
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                            }`}
+                            title="Pointer Présent"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Présent</span>
+                          </button>
 
-                        {/* Bouton Retard */}
-                        <button
-                          onClick={() => {
-                            setEditingPresence({
-                              id: presence?.id,
-                              enseignant_id: ens.id,
-                              enseignant_nom: `${ens.nom} ${ens.prenom}`,
-                              annee_scolaire: selectedAnnee,
-                              date: selectedDate,
-                              statut: 'RETARD',
-                              motif: presence?.motif || 'Retard justifié',
-                              heure_arrivee: presence?.heure_arrivee || '07:45',
-                            });
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
-                            isRetard
-                              ? 'bg-amber-500 text-slate-950 shadow-xs'
-                              : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                          }`}
-                          title="Signaler un retard"
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Retard</span>
-                        </button>
-
-                        {/* Bouton Absence */}
-                        <button
-                          onClick={() => {
-                            setEditingPresence({
-                              id: presence?.id,
-                              enseignant_id: ens.id,
-                              enseignant_nom: `${ens.nom} ${ens.prenom}`,
-                              annee_scolaire: selectedAnnee,
-                              date: selectedDate,
-                              statut: 'ABSENCE',
-                              motif: presence?.motif || 'Maladie',
-                              heure_arrivee: '',
-                            });
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
-                            isAbsence
-                              ? 'bg-red-600 text-white shadow-xs'
-                              : 'bg-red-50 text-red-800 hover:bg-red-100 border border-red-200'
-                          }`}
-                          title="Signaler une absence"
-                        >
-                          <UserX className="w-3.5 h-3.5" />
-                          <span>Absence</span>
-                        </button>
-
-                        {/* Bouton Permission */}
-                        <button
-                          onClick={() => {
-                            setEditingPresence({
-                              id: presence?.id,
-                              enseignant_id: ens.id,
-                              enseignant_nom: `${ens.nom} ${ens.prenom}`,
-                              annee_scolaire: selectedAnnee,
-                              date: selectedDate,
-                              statut: 'PERMISSION',
-                              motif: presence?.motif || 'Permission administrative',
-                              heure_arrivee: '',
-                            });
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
-                            isPermission
-                              ? 'bg-purple-600 text-white shadow-xs'
-                              : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
-                          }`}
-                          title="Signaler une permission"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Permission</span>
-                        </button>
-
-                        {/* Modifier / Corriger */}
-                        {presence && (
+                          {/* Bouton Retard */}
                           <button
                             onClick={() => {
                               setEditingPresence({
-                                id: presence.id,
+                                id: presence?.id,
                                 enseignant_id: ens.id,
                                 enseignant_nom: `${ens.nom} ${ens.prenom}`,
-                                annee_scolaire: presence.annee_scolaire || selectedAnnee,
+                                annee_scolaire: selectedAnnee,
                                 date: selectedDate,
-                                statut: presence.statut,
-                                motif: presence.motif || '',
-                                heure_arrivee: presence.heure_arrivee || '',
+                                statut: 'RETARD',
+                                motif: presence?.motif || 'Retard justifié',
+                                heure_arrivee: presence?.heure_arrivee || '07:45',
                               });
                             }}
-                            className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
-                            title="Corriger ou modifier la saisie"
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
+                              isRetard
+                                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                            }`}
+                            title="Signaler un retard"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Retard</span>
                           </button>
-                        )}
-                      </div>
+
+                          {/* Bouton Absence */}
+                          <button
+                            onClick={() => {
+                              setEditingPresence({
+                                id: presence?.id,
+                                enseignant_id: ens.id,
+                                enseignant_nom: `${ens.nom} ${ens.prenom}`,
+                                annee_scolaire: selectedAnnee,
+                                date: selectedDate,
+                                statut: 'ABSENCE',
+                                motif: presence?.motif || 'Maladie',
+                                heure_arrivee: '',
+                              });
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
+                              isAbsence
+                                ? 'bg-red-600 text-white shadow-xs'
+                                : 'bg-red-50 text-red-800 hover:bg-red-100 border border-red-200'
+                            }`}
+                            title="Signaler une absence"
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                            <span>Absence</span>
+                          </button>
+
+                          {/* Bouton Permission */}
+                          <button
+                            onClick={() => {
+                              setEditingPresence({
+                                id: presence?.id,
+                                enseignant_id: ens.id,
+                                enseignant_nom: `${ens.nom} ${ens.prenom}`,
+                                annee_scolaire: selectedAnnee,
+                                date: selectedDate,
+                                statut: 'PERMISSION',
+                                motif: presence?.motif || 'Permission administrative',
+                                heure_arrivee: '',
+                              });
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer ${
+                              isPermission
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+                            }`}
+                            title="Signaler une permission"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Permission</span>
+                          </button>
+
+                          {/* Modifier / Corriger */}
+                          {presence && (
+                            <button
+                              onClick={() => {
+                                setEditingPresence({
+                                  id: presence.id,
+                                  enseignant_id: ens.id,
+                                  enseignant_nom: `${ens.nom} ${ens.prenom}`,
+                                  annee_scolaire: presence.annee_scolaire || selectedAnnee,
+                                  date: selectedDate,
+                                  statut: presence.statut,
+                                  motif: presence.motif || '',
+                                  heure_arrivee: presence.heure_arrivee || '',
+                                });
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                              title="Corriger ou modifier la saisie"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-full lg:w-auto flex justify-end items-center">
+                          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center space-x-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            <span>{presence ? `Enregistré (${presence.statut})` : 'Non pointé par le Censeur'}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -799,9 +833,9 @@ export const PresenceEnseignants: React.FC = () => {
       )}
 
       {/* ==================================================================== */}
-      {/* ONGLET 2 : SAISIE DÉTAILLÉE / FORMULAIRE INDIVIDUEL */}
+      {/* ONGLET 2 : SAISIE DÉTAILLÉE / FORMULAIRE INDIVIDUEL (RÉSERVÉ AU CENSEUR) */}
       {/* ==================================================================== */}
-      {activeTab === 'formulaire' && (
+      {activeTab === 'formulaire' && canManage && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 sm:p-6 max-w-2xl mx-auto">
           <div className="flex items-center space-x-2 pb-4 border-b border-slate-200 mb-5">
             <Plus className="w-5 h-5 text-emerald-600" />
@@ -1199,7 +1233,7 @@ export const PresenceEnseignants: React.FC = () => {
                       <th className="px-3.5 py-2.5">Heure / Motif</th>
                       <th className="px-3.5 py-2.5">Année</th>
                       <th className="px-3.5 py-2.5">Enregistré par</th>
-                      <th className="px-3.5 py-2.5 text-right">Actions</th>
+                      {canManage && <th className="px-3.5 py-2.5 text-right">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1270,35 +1304,37 @@ export const PresenceEnseignants: React.FC = () => {
                               })}
                             </div>
                           </td>
-                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end space-x-1.5">
-                              <button
-                                onClick={() => {
-                                  setEditingPresence({
-                                    id: p.id,
-                                    enseignant_id: p.enseignant_id,
-                                    enseignant_nom: p.enseignant_nom,
-                                    annee_scolaire: p.annee_scolaire,
-                                    date: p.date,
-                                    statut: p.statut,
-                                    motif: p.motif || '',
-                                    heure_arrivee: p.heure_arrivee || '',
-                                  });
-                                }}
-                                className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
-                                title="Modifier l'enregistrement"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeletePresence(p.id, p.enseignant_nom)}
-                                className="p-1 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded cursor-pointer"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
+                          {canManage && (
+                            <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                <button
+                                  onClick={() => {
+                                    setEditingPresence({
+                                      id: p.id,
+                                      enseignant_id: p.enseignant_id,
+                                      enseignant_nom: p.enseignant_nom,
+                                      annee_scolaire: p.annee_scolaire,
+                                      date: p.date,
+                                      statut: p.statut,
+                                      motif: p.motif || '',
+                                      heure_arrivee: p.heure_arrivee || '',
+                                    });
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
+                                  title="Modifier l'enregistrement"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeletePresence(p.id, p.enseignant_nom)}
+                                  className="p-1 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded cursor-pointer"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1311,9 +1347,9 @@ export const PresenceEnseignants: React.FC = () => {
       )}
 
       {/* ==================================================================== */}
-      {/* MODAL DE MODIFICATION / CORRECTION D'UNE PRÉSENCE */}
+      {/* MODAL DE MODIFICATION / CORRECTION D'UNE PRÉSENCE (RÉSERVÉE AU CENSEUR) */}
       {/* ==================================================================== */}
-      {editingPresence && (
+      {editingPresence && canManage && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in duration-200">
             <div className="p-4 bg-slate-900 text-white flex justify-between items-center">

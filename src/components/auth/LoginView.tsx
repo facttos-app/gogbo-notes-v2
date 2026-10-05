@@ -16,10 +16,11 @@ import {
   KeyRound,
   X,
   Lock,
-  RefreshCw
+  RefreshCw,
+  Users
 } from 'lucide-react';
 
-export type PortalType = 'ADMIN' | 'ENSEIGNANT';
+export type PortalType = 'ADMIN' | 'ENSEIGNANT' | 'PARENT';
 
 interface LoginViewProps {
   onBackToHome?: () => void;
@@ -173,25 +174,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
 
       {/* Conteneur principal avec Séparation des deux portails */}
       <main className="w-full max-w-xl bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        {/* Sélecteur des 2 Portails (Exigence 2) */}
-        <div className="grid grid-cols-2 p-1.5 bg-slate-100 border-b border-slate-200 gap-1.5">
+        {/* Sélecteur des 3 Portails (Administration, Enseignants, Parents) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 p-1.5 bg-slate-100 border-b border-slate-200 gap-1.5">
           <button
             id="portal-btn-admin"
             type="button"
             onClick={() => handlePortalSwitch('ADMIN')}
-            className={`flex items-center justify-center space-x-2 py-3 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all duration-150 ${
+            className={`flex items-center justify-center space-x-2 py-2.5 px-2.5 rounded-xl font-bold text-xs transition-all duration-150 ${
               activePortal === 'ADMIN'
                 ? 'bg-slate-900 text-white shadow-md border border-slate-800'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
-            <ShieldCheck className={`w-4 h-4 ${activePortal === 'ADMIN' ? 'text-amber-400' : 'text-slate-500'}`} />
-            <div className="text-left">
-              <div className="text-[10px] uppercase font-bold text-amber-400">Portail Administration</div>
-              <div className="leading-tight font-black text-xs sm:text-sm">ACCÈS ADMINISTRATION</div>
-              <div className={`text-[10px] font-normal ${activePortal === 'ADMIN' ? 'text-slate-300' : 'text-slate-500'} hidden sm:block`}>
-                Direction, Censeur, Surveillance, Comptabilité
-              </div>
+            <ShieldCheck className={`w-4 h-4 shrink-0 ${activePortal === 'ADMIN' ? 'text-amber-400' : 'text-slate-500'}`} />
+            <div className="text-left min-w-0">
+              <div className="text-[9px] uppercase font-bold text-amber-400">Direction</div>
+              <div className="leading-tight font-black text-xs truncate">ADMINISTRATION</div>
             </div>
           </button>
 
@@ -199,19 +197,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
             id="portal-btn-enseignant"
             type="button"
             onClick={() => handlePortalSwitch('ENSEIGNANT')}
-            className={`flex items-center justify-center space-x-2 py-3 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all duration-150 ${
+            className={`flex items-center justify-center space-x-2 py-2.5 px-2.5 rounded-xl font-bold text-xs transition-all duration-150 ${
               activePortal === 'ENSEIGNANT'
                 ? 'bg-emerald-800 text-white shadow-md border border-emerald-700'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
-            <BookOpen className={`w-4 h-4 ${activePortal === 'ENSEIGNANT' ? 'text-amber-300' : 'text-slate-500'}`} />
-            <div className="text-left">
-              <div className="text-[10px] uppercase font-bold text-emerald-400">Portail Enseignants</div>
-              <div className="leading-tight font-black text-xs sm:text-sm">ACCÈS ENSEIGNANTS</div>
-              <div className={`text-[10px] font-normal ${activePortal === 'ENSEIGNANT' ? 'text-emerald-200' : 'text-slate-500'} hidden sm:block`}>
-                Espace pédagogique, devoirs & saisie de notes
-              </div>
+            <BookOpen className={`w-4 h-4 shrink-0 ${activePortal === 'ENSEIGNANT' ? 'text-amber-300' : 'text-slate-500'}`} />
+            <div className="text-left min-w-0">
+              <div className="text-[9px] uppercase font-bold text-emerald-400">Pédagogie</div>
+              <div className="leading-tight font-black text-xs truncate">ENSEIGNANTS</div>
+            </div>
+          </button>
+
+          <button
+            id="portal-btn-parent"
+            type="button"
+            onClick={() => handlePortalSwitch('PARENT')}
+            className={`flex items-center justify-center space-x-2 py-2.5 px-2.5 rounded-xl font-bold text-xs transition-all duration-150 ${
+              activePortal === 'PARENT'
+                ? 'bg-indigo-900 text-white shadow-md border border-indigo-800'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <Users className={`w-4 h-4 shrink-0 ${activePortal === 'PARENT' ? 'text-indigo-300' : 'text-slate-500'}`} />
+            <div className="text-left min-w-0">
+              <div className="text-[9px] uppercase font-bold text-indigo-300">Famille</div>
+              <div className="leading-tight font-black text-xs truncate">PARENTS D'ÉLÈVES</div>
             </div>
           </button>
         </div>
@@ -225,36 +237,50 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
                 className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider mb-1.5 ${
                   activePortal === 'ADMIN'
                     ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                    : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    : activePortal === 'ENSEIGNANT'
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      : 'bg-indigo-100 text-indigo-900 border border-indigo-300'
                 }`}
               >
-                {activePortal === 'ADMIN' ? 'Espace Direction & Gestion Administrative' : 'Espace Pédagogique & Évaluations'}
+                {activePortal === 'ADMIN'
+                  ? 'Espace Direction & Gestion Administrative'
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'Espace Pédagogique & Évaluations'
+                    : 'Portail Familles & Suivi Parental'}
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                {activePortal === 'ADMIN' ? 'Connexion — Administration du CEG' : 'Connexion — Corps Enseignant'}
+                {activePortal === 'ADMIN'
+                  ? 'Connexion — Administration du CEG'
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'Connexion — Corps Enseignant'
+                    : 'Connexion — Espace Parents d’Élèves'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 {activePortal === 'ADMIN'
                   ? 'Réservé au Directeur Général, Censeur, Surveillant Général et Comptable.'
-                  : 'Réservé aux enseignants pour la saisie et consultation de leurs notes.'}
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'Réservé aux enseignants pour la saisie et consultation de leurs notes.'
+                    : 'Réservé aux pères, mères et tuteurs légaux pour le suivi des notes, bulletins et discipline de leurs enfants.'}
               </p>
             </div>
 
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                activePortal === 'ADMIN' ? 'bg-slate-900 text-amber-400' : 'bg-emerald-700 text-white'
+                activePortal === 'ADMIN'
+                  ? 'bg-slate-900 text-amber-400'
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-indigo-900 text-white'
               }`}
             >
-              {activePortal === 'ADMIN' ? <Building2 className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+              {activePortal === 'ADMIN' ? (
+                <Building2 className="w-5 h-5" />
+              ) : activePortal === 'ENSEIGNANT' ? (
+                <BookOpen className="w-5 h-5" />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
             </div>
-          </div>
-
-          {/* Rappel bienveillant Double Casquette (Exigence 3) */}
-          <div className="mb-4 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 flex items-start space-x-2">
-            <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <p>
-              <strong>Double fonction reconnue :</strong> Le Censeur (SVT) et le Directeur Général (Mathématiques) disposent également d’affectations de cours et peuvent accéder à leur espace pédagogique.
-            </p>
           </div>
 
           {/* Message d'erreur avec bouton de changement si mauvais portail */}
@@ -267,7 +293,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
                   <button
                     type="button"
                     onClick={() => handlePortalSwitch('ENSEIGNANT')}
-                    className="mt-1.5 text-xs text-emerald-800 underline font-bold hover:text-emerald-950"
+                    className="mt-1.5 text-xs text-emerald-800 underline font-bold hover:text-emerald-950 block"
                   >
                     Basculer immédiatement vers le Portail Enseignants →
                   </button>
@@ -276,9 +302,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
                   <button
                     type="button"
                     onClick={() => handlePortalSwitch('ADMIN')}
-                    className="mt-1.5 text-xs text-slate-800 underline font-bold hover:text-slate-950"
+                    className="mt-1.5 text-xs text-slate-800 underline font-bold hover:text-slate-950 block"
                   >
                     Basculer immédiatement vers le Portail Administration →
+                  </button>
+                )}
+                {error.includes('Espace Parents') && (
+                  <button
+                    type="button"
+                    onClick={() => handlePortalSwitch('PARENT')}
+                    className="mt-1.5 text-xs text-indigo-800 underline font-bold hover:text-indigo-950 block"
+                  >
+                    Basculer immédiatement vers l'Espace Parents →
                   </button>
                 )}
               </div>
@@ -289,7 +324,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="login-email-input" className="block text-slate-700 font-semibold mb-1 text-xs sm:text-sm">
-                Identifiant ou Email académique <span className="text-red-500">*</span>
+                {activePortal === 'ADMIN'
+                  ? 'Identifiant ou Email académique'
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'Email académique ou Téléphone'
+                    : 'Numéro de téléphone ou Email du parent'}{' '}
+                <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -297,9 +337,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
                 </div>
                 <input
                   id="login-email-input"
-                  type="email"
+                  type="text"
+                  autoComplete="username"
                   required
-                  placeholder={activePortal === 'ADMIN' ? 'censeur@ceggogbo.bj' : 'prof.maths@ceggogbo.bj'}
+                  placeholder={
+                    activePortal === 'ADMIN'
+                      ? 'censeur@ceggogbo.bj ou dg@ceggogbo.bj'
+                      : activePortal === 'ENSEIGNANT'
+                        ? 'prof.maths@ceggogbo.bj ou +229 97...'
+                        : '+229 97 45 67 89 ou parent.houenou@gmail.com'
+                  }
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
@@ -344,10 +391,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
               className={`w-full py-3 text-white font-extrabold rounded-xl transition-all duration-150 flex items-center justify-center space-x-2 text-sm shadow-md tracking-wider uppercase ${
                 activePortal === 'ADMIN'
                   ? 'bg-slate-900 hover:bg-slate-800 border border-slate-800'
-                  : 'bg-emerald-700 hover:bg-emerald-800 border border-emerald-600'
+                  : activePortal === 'ENSEIGNANT'
+                    ? 'bg-emerald-700 hover:bg-emerald-800 border border-emerald-600'
+                    : 'bg-indigo-800 hover:bg-indigo-900 border border-indigo-700'
               } disabled:opacity-50 cursor-pointer`}
             >
-              <span>{loading ? 'Vérification en cours...' : 'SE CONNECTER'}</span>
+              <span>{loading ? 'Vérification en cours...' : activePortal === 'PARENT' ? 'ACCÉDER À L\'ESPACE PARENTS' : 'SE CONNECTER'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AnneeScolaire } from '../types';
 import { storage } from '../lib/storage';
+import { OFFICIAL_ANNEES_SCOLAIRES } from '../lib/constants';
 
 interface AnneeContextType {
   annees: AnneeScolaire[];
@@ -20,21 +21,46 @@ const AnneeContext = createContext<AnneeContextType | undefined>(undefined);
 
 const SELECTED_ANNEE_STORAGE_KEY = 'gogbo_v2_selected_annee_id';
 
+const defaultFallbackAnnee: AnneeScolaire = OFFICIAL_ANNEES_SCOLAIRES[1] || {
+  id: 'annee-2026-2027',
+  libelle: '2026–2027',
+  date_debut: '2026-09-15',
+  date_fin: '2027-06-30',
+  is_active: true,
+  statut: 'EN_COURS',
+  created_at: '2026-08-01T08:00:00Z',
+};
+
+const getSafeActiveAnnee = (): AnneeScolaire => {
+  try {
+    const a = storage.getActiveAnneeScolaire();
+    if (a && a.libelle) return a;
+  } catch (e) {
+    console.warn('Error reading active annee:', e);
+  }
+  return defaultFallbackAnnee;
+};
+
 export const AnneeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [annees, setAnnees] = useState<AnneeScolaire[]>([]);
-  const [activeAnnee, setActiveAnnee] = useState<AnneeScolaire>(storage.getActiveAnneeScolaire());
-  const [selectedAnnee, setSelectedAnneeState] = useState<AnneeScolaire>(storage.getActiveAnneeScolaire());
+  const [activeAnnee, setActiveAnnee] = useState<AnneeScolaire>(getSafeActiveAnnee);
+  const [selectedAnnee, setSelectedAnneeState] = useState<AnneeScolaire>(getSafeActiveAnnee);
 
   const refreshAnnees = () => {
-    const list = storage.getAnneesScolaires();
-    setAnnees(list);
-    const active = storage.getActiveAnneeScolaire();
-    setActiveAnnee(active);
+    try {
+      const list = storage.getAnneesScolaires();
+      const safeList = Array.isArray(list) && list.length > 0 ? list : OFFICIAL_ANNEES_SCOLAIRES;
+      setAnnees(safeList);
+      const active = storage.getActiveAnneeScolaire() || defaultFallbackAnnee;
+      setActiveAnnee(active);
 
-    const savedId = localStorage.getItem(SELECTED_ANNEE_STORAGE_KEY);
-    const found = list.find((a) => a.id === savedId) || active || list[0];
-    if (found) {
-      setSelectedAnneeState(found);
+      const savedId = storage.rawGet(SELECTED_ANNEE_STORAGE_KEY);
+      const found = safeList.find((a) => a.id === savedId) || active || safeList[0] || defaultFallbackAnnee;
+      if (found) {
+        setSelectedAnneeState(found);
+      }
+    } catch (e) {
+      console.warn('refreshAnnees notice:', e);
     }
   };
 
@@ -44,7 +70,7 @@ export const AnneeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setSelectedAnnee = (annee: AnneeScolaire) => {
     setSelectedAnneeState(annee);
-    localStorage.setItem(SELECTED_ANNEE_STORAGE_KEY, annee.id);
+    storage.rawSet(SELECTED_ANNEE_STORAGE_KEY, annee.id);
   };
 
   const setSelectedAnneeByLibelle = (libelle: string) => {

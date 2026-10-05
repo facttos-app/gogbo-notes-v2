@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { storage } from '../lib/storage';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -17,18 +18,25 @@ import {
   User,
   Trophy,
   FileText,
-  CalendarCheck
+  CalendarCheck,
+  UserCheck,
+  BarChart3
 } from 'lucide-react';
 
 export type TabKey = 
   | 'censeur_dashboard'
   | 'presence_enseignants'
+  | 'resultats_statistiques'
   | 'pedagogique'
+  | 'professeur_principal_espace'
   | 'classement'
   | 'bulletins'
   | 'eleves'
+  | 'parents'
+  | 'espace_parent'
   | 'enseignants'
   | 'affectations'
+  | 'professeurs_principaux'
   | 'classes'
   | 'matieres'
   | 'periodes'
@@ -54,6 +62,17 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
   const getTabs = () => {
     const tabs: { key: TabKey; label: string; icon: React.ReactNode; badge?: string }[] = [];
 
+    // 0. ESPACE PARENT D'ÉLÈVE
+    if (currentUser.role === 'PARENT') {
+      tabs.push({
+        key: 'espace_parent',
+        label: 'Mon Espace Famille & Enfants',
+        icon: <Users className="w-4 h-4 text-indigo-500" />,
+        badge: 'Mes Enfants',
+      });
+      return tabs;
+    }
+
     // 1. ESPACE DIRECTEUR GÉNÉRAL
     if (isDirecteur) {
       tabs.push({
@@ -71,12 +90,16 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         });
       }
       tabs.push(
+        { key: 'resultats_statistiques', label: 'Résultats Statistiques', icon: <BarChart3 className="w-4 h-4 text-emerald-400" />, badge: '3 Bilans' },
         { key: 'classement', label: 'Classement', icon: <Trophy className="w-4 h-4 text-amber-400" /> },
         { key: 'bulletins', label: 'Bulletins Scolaires', icon: <FileText className="w-4 h-4 text-emerald-400" /> },
+        { key: 'surveillant', label: 'Discipline & Punitions', icon: <ShieldCheck className="w-4 h-4 text-rose-400" /> },
         { key: 'presence_enseignants', label: 'Présence Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-400" /> },
         { key: 'eleves', label: 'Consultation Élèves', icon: <Users className="w-4 h-4" /> },
+        { key: 'parents', label: 'Parents d’Élèves', icon: <Users className="w-4 h-4 text-indigo-400" /> },
         { key: 'enseignants', label: 'Enseignants', icon: <GraduationCap className="w-4 h-4" /> },
         { key: 'affectations', label: 'Attribution de classe', icon: <Network className="w-4 h-4 text-emerald-400" /> },
+        { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
         { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
         { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' },
         { key: 'audit', label: 'Journal d’Audit', icon: <History className="w-4 h-4" /> }
@@ -103,12 +126,16 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         });
       }
       tabs.push(
+        { key: 'resultats_statistiques', label: 'Résultats Statistiques', icon: <BarChart3 className="w-4 h-4 text-emerald-400" />, badge: 'Global CEG' },
         { key: 'presence_enseignants', label: 'Présence Journalière Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-400" />, badge: 'Quotidien' },
         { key: 'classement', label: 'Classement', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
         { key: 'bulletins', label: 'Bulletins Scolaires', icon: <FileText className="w-4 h-4 text-emerald-600" /> },
+        { key: 'surveillant', label: 'Discipline & Punitions', icon: <ShieldCheck className="w-4 h-4 text-rose-400" /> },
         { key: 'eleves', label: 'Élèves', icon: <Users className="w-4 h-4" /> },
+        { key: 'parents', label: 'Gestion Parents', icon: <Users className="w-4 h-4 text-indigo-400" /> },
         { key: 'enseignants', label: 'Enseignants', icon: <GraduationCap className="w-4 h-4" /> },
         { key: 'affectations', label: 'Attribution de classe', icon: <Network className="w-4 h-4 text-emerald-500" /> },
+        { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
         { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
         { key: 'matieres', label: 'Matières & Coefs', icon: <Layers className="w-4 h-4" /> },
         { key: 'periodes', label: 'Périodes', icon: <CalendarDays className="w-4 h-4" /> },
@@ -136,9 +163,18 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         });
       }
       tabs.push(
-        { key: 'classement', label: 'Palmarès & Rangs', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
-        { key: 'eleves', label: 'Registre Élèves', icon: <Users className="w-4 h-4" /> },
-        { key: 'classes', label: 'Classes', icon: <School className="w-4 h-4" /> }
+        { key: 'resultats_statistiques', label: 'Résultats Statistiques', icon: <BarChart3 className="w-4 h-4 text-emerald-500" />, badge: '3 Bilans' },
+        { key: 'eleves', label: 'Apprenants (28 Classes)', icon: <Users className="w-4 h-4" /> },
+        { key: 'classement', label: 'Classement & Résultats', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
+        { key: 'bulletins', label: 'Bulletins Scolaires', icon: <FileText className="w-4 h-4 text-emerald-500" /> },
+        { key: 'enseignants', label: 'Enseignants', icon: <GraduationCap className="w-4 h-4" /> },
+        { key: 'affectations', label: 'Attribution de classe', icon: <Network className="w-4 h-4 text-emerald-400" /> },
+        { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
+        { key: 'presence_enseignants', label: 'Présence Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-500" /> },
+        { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
+        { key: 'comptable', label: 'Activités Comptable', icon: <CreditCard className="w-4 h-4 text-teal-400" /> },
+        { key: 'audit', label: 'Activités Censeur', icon: <History className="w-4 h-4" /> },
+        { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' }
       );
       return tabs;
     }
@@ -148,7 +184,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
       tabs.push(
         {
           key: 'comptable',
-          label: 'Comptabilité & Effectifs',
+          label: 'Comptabilité & Versements',
           icon: <CreditCard className="w-4 h-4" />,
         }
       );
@@ -160,29 +196,60 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         });
       }
       tabs.push(
-        { key: 'eleves', label: 'Élèves Inscrits', icon: <Users className="w-4 h-4" /> },
-        { key: 'classes', label: 'Classes', icon: <School className="w-4 h-4" /> }
+        { key: 'resultats_statistiques', label: 'Résultats Statistiques', icon: <BarChart3 className="w-4 h-4 text-emerald-500" />, badge: '3 Bilans' },
+        { key: 'eleves', label: 'Apprenants (28 Classes)', icon: <Users className="w-4 h-4" /> },
+        { key: 'classement', label: 'Classement & Résultats', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
+        { key: 'bulletins', label: 'Bulletins Scolaires', icon: <FileText className="w-4 h-4 text-emerald-500" /> },
+        { key: 'enseignants', label: 'Enseignants', icon: <GraduationCap className="w-4 h-4" /> },
+        { key: 'affectations', label: 'Attribution de classe', icon: <Network className="w-4 h-4 text-emerald-400" /> },
+        { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
+        { key: 'presence_enseignants', label: 'Présence Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-500" /> },
+        { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
+        { key: 'surveillant', label: 'Surveillance & Discipline', icon: <ShieldCheck className="w-4 h-4 text-blue-400" /> },
+        { key: 'audit', label: 'Activités Censeur', icon: <History className="w-4 h-4" /> },
+        { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' }
       );
       return tabs;
     }
 
-    // 5. ESPACE ENSEIGNANT (STRICTEMENT PÉDAGOGIQUE)
+    // 5. ESPACE ENSEIGNANT (CONSULTATION GLOBALE DE TOUTES LES INFORMATIONS SCOLAIRES)
     tabs.push(
       {
         key: 'pedagogique',
         label: 'Mon Espace Pédagogique',
-        icon: <BookOpen className="w-4 h-4" />,
-      },
-      {
-        key: 'classement',
-        label: 'Classement de mes Classes',
-        icon: <Trophy className="w-4 h-4 text-amber-500" />,
-      },
-      {
-        key: 'bulletins',
-        label: 'Bulletins Scolaires',
-        icon: <FileText className="w-4 h-4 text-emerald-600" />,
+        icon: <BookOpen className="w-4 h-4 text-emerald-400" />,
+        badge: 'Mes Notes',
       }
+    );
+
+    // Si l'enseignant est Professeur Principal d'une classe pour l'année active
+    const activeAnneeLibelle = storage.getActiveAnneeScolaire().libelle;
+    const ppAssignment = currentUser ? storage.getActiveProfesseurPrincipalByEnseignant(currentUser.id, activeAnneeLibelle) : undefined;
+    const ppClasse = ppAssignment ? storage.getClasseById(ppAssignment.classe_id) : undefined;
+
+    if (ppAssignment && ppClasse) {
+      tabs.push({
+        key: 'professeur_principal_espace',
+        label: `Professeur Principal (${ppClasse.nom})`,
+        icon: <UserCheck className="w-4 h-4 text-indigo-400" />,
+        badge: ppClasse.nom,
+      });
+    }
+
+    tabs.push(
+      { key: 'resultats_statistiques', label: 'Résultats Statistiques', icon: <BarChart3 className="w-4 h-4 text-emerald-500" />, badge: '3 Bilans' },
+      { key: 'eleves', label: 'Apprenants (28 Classes)', icon: <Users className="w-4 h-4" /> },
+      { key: 'classement', label: 'Classement & Résultats', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
+      { key: 'bulletins', label: 'Bulletins Scolaires', icon: <FileText className="w-4 h-4 text-emerald-500" /> },
+      { key: 'enseignants', label: 'Corps Enseignant', icon: <GraduationCap className="w-4 h-4" /> },
+      { key: 'affectations', label: 'Attribution de classe', icon: <Network className="w-4 h-4 text-emerald-400" /> },
+      { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
+      { key: 'presence_enseignants', label: 'Présence Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-400" /> },
+      { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
+      { key: 'surveillant', label: 'Surveillance & Discipline', icon: <ShieldCheck className="w-4 h-4 text-blue-400" /> },
+      { key: 'comptable', label: 'Activités Comptable', icon: <CreditCard className="w-4 h-4 text-teal-400" /> },
+      { key: 'audit', label: 'Activités du Censeur', icon: <History className="w-4 h-4" /> },
+      { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' }
     );
 
     return tabs;

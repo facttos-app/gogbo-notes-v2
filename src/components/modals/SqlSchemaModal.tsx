@@ -84,7 +84,35 @@ CREATE POLICY "Gestion presences_enseignants Censeur et DG"
 CREATE POLICY "Lecture presences_enseignants propre compte"
   ON public.presences_enseignants FOR SELECT
   TO authenticated
-  USING (enseignant_id = auth.uid() OR public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR', 'DIRECTEUR_GENERAL', 'SURVEILLANT_GENERAL'));`;
+  USING (enseignant_id = auth.uid() OR public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR', 'DIRECTEUR_GENERAL', 'SURVEILLANT_GENERAL'));
+
+-- 15. PROFESSEURS PRINCIPAUX (RÈGLE ABSOLUE : 1 ENSEIGNANT = 1 CLASSE PP / 1 CLASSE = 1 PP)
+CREATE TABLE IF NOT EXISTS public.professeurs_principaux (
+  id TEXT PRIMARY KEY,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  classe_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE RESTRICT,
+  annee_scolaire TEXT NOT NULL,
+  statut TEXT NOT NULL DEFAULT 'ACTIF' CHECK (statut IN ('ACTIF', 'CLOTURE')),
+  date_nomination DATE DEFAULT CURRENT_DATE,
+  date_fin DATE,
+  motif_fin TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- RÈGLES ABSOLUES POSTGRESQL :
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_unique_enseignant_annee_actif 
+  ON public.professeurs_principaux (profile_id, annee_scolaire) 
+  WHERE statut = 'ACTIF';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_unique_classe_annee_actif 
+  ON public.professeurs_principaux (classe_id, annee_scolaire) 
+  WHERE statut = 'ACTIF';
+
+ALTER TABLE public.professeurs_principaux ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lecture professeurs_principaux" ON public.professeurs_principaux FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Gestion PP Censeur et Concepteur" ON public.professeurs_principaux FOR ALL TO authenticated USING (public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR'));`;
 
   const seedSql = `-- Initialisation des 28 Classes Officielles et Matières
 -- Fichier source : /supabase/seed.sql

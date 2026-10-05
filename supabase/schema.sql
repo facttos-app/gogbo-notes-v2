@@ -240,6 +240,39 @@ CREATE TABLE IF NOT EXISTS public.presences_enseignants (
   CONSTRAINT unique_enseignant_date_annee UNIQUE (enseignant_id, date, annee_scolaire)
 );
 
+-- 15. TABLE PROFESSEURS PRINCIPAUX (Module Censeur - Règle stricte 1 Enseignant = 1 Classe / 1 Classe = 1 PP)
+DO $$ BEGIN
+  CREATE TYPE statut_pp AS ENUM ('ACTIF', 'CLOTURE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.professeurs_principaux (
+  id TEXT PRIMARY KEY,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  classe_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE RESTRICT,
+  annee_scolaire TEXT NOT NULL,
+  statut statut_pp NOT NULL DEFAULT 'ACTIF',
+  date_nomination DATE DEFAULT CURRENT_DATE,
+  date_fin DATE,
+  motif_fin TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ====================================================================
+-- CONTRAINTES STRICTES POSTGRESQL (GARANTIE AU NIVEAU DE LA BASE)
+-- ====================================================================
+-- RÈGLE 1 : Un enseignant ne peut être Professeur Principal que d'UNE SEULE classe active par année
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_unique_enseignant_annee_actif 
+  ON public.professeurs_principaux (profile_id, annee_scolaire) 
+  WHERE statut = 'ACTIF';
+
+-- RÈGLE 2 : Une classe ne peut avoir qu'UN SEUL Professeur Principal actif par année
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_unique_classe_annee_actif 
+  ON public.professeurs_principaux (classe_id, annee_scolaire) 
+  WHERE statut = 'ACTIF';
+
 -- ====================================================================
 -- RLS (ROW LEVEL SECURITY) POLICIES - SÉCURITÉ PLURIANNUELLE ÉTANCHE
 -- ====================================================================
@@ -256,6 +289,7 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.parametres_ecole ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.presences_enseignants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.professeurs_principaux ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: Récupérer le rôle de l'utilisateur connecté
 CREATE OR REPLACE FUNCTION public.get_current_role()
@@ -408,6 +442,39 @@ CREATE POLICY "Gestion presences_enseignants reservee Censeur et DG"
   USING (public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR', 'DIRECTEUR_GENERAL'))
   WITH CHECK (public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR', 'DIRECTEUR_GENERAL'));
 
+-- ====================================================================
+-- POLITIQUES RLS : PROFESSEURS PRINCIPAUX (PP)
+-- ====================================================================
+
+-- 1. Consultation des professeurs principaux :
+CREATE POLICY "Lecture professeurs_principaux pour tous les connectes"
+  ON public.professeurs_principaux FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 2. Gestion des attributions PP (Censeur et Concepteur) :
+CREATE POLICY "Gestion professeurs_principaux Censeur et Concepteur"
+  ON public.professeurs_principaux FOR ALL
+  TO authenticated
+  USING (public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR'))
+  WITH CHECK (public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR'));
+
+-- 3. Autorisation spéciale pour le PP actif d'inscrire des élèves dans SA classe :
+CREATE POLICY "PP peut inscrire des apprenants dans sa classe"
+  ON public.inscriptions_eleves FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    public.get_current_role() IN ('CONCEPTEUR', 'CENSEUR', 'DIRECTEUR_GENERAL')
+    OR
+    EXISTS (
+      SELECT 1 FROM public.professeurs_principaux pp
+      WHERE pp.profile_id = auth.uid()
+        AND pp.classe_id = inscriptions_eleves.classe_id
+        AND pp.annee_scolaire = inscriptions_eleves.annee_scolaire
+        AND pp.statut = 'ACTIF'
+    )
+  );
+
 -- Index d'optimisation
 CREATE INDEX IF NOT EXISTS idx_inscriptions_eleve_annee ON public.inscriptions_eleves(eleve_id, annee_scolaire);
 CREATE INDEX IF NOT EXISTS idx_inscriptions_classe_annee ON public.inscriptions_eleves(classe_id, annee_scolaire);
@@ -417,4 +484,7 @@ CREATE INDEX IF NOT EXISTS idx_periodes_annee ON public.periodes(annee_scolaire)
 CREATE INDEX IF NOT EXISTS idx_presences_enseignants_date ON public.presences_enseignants(date);
 CREATE INDEX IF NOT EXISTS idx_presences_enseignants_annee ON public.presences_enseignants(annee_scolaire);
 CREATE INDEX IF NOT EXISTS idx_presences_enseignants_enseignant ON public.presences_enseignants(enseignant_id);
+CREATE INDEX IF NOT EXISTS idx_pp_annee ON public.professeurs_principaux(annee_scolaire);
+CREATE INDEX IF NOT EXISTS idx_pp_profile ON public.professeurs_principaux(profile_id);
+CREATE INDEX IF NOT EXISTS idx_pp_classe ON public.professeurs_principaux(classe_id);
 

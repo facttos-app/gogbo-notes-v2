@@ -27,24 +27,27 @@ export const ClassementView: React.FC<ClassementViewProps> = ({ onOpenBulletin }
   const { selectedAnnee, annees } = useAnnee();
 
   const classes = storage.getClasses();
-  const periodes = storage.getPeriodes().filter((p) => p.annee_scolaire === selectedAnnee.libelle);
+  const periodes = storage.getPeriodesByAnnee(selectedAnnee?.libelle);
   const activePeriode = periodes.find((p) => p.is_active) || periodes[0] || storage.getActivePeriode();
 
-  // Filtrage des classes accessibles pour les enseignants
-  const allowedClasses = React.useMemo(() => {
-    if (isCenseur || isDirecteur) return classes;
-    const teacherAffs = storage.getAffectationsByProfile(currentUser?.id || '', selectedAnnee.libelle);
-    const teacherClasseIds = new Set(teacherAffs.map((a) => a.classe_id));
-    return classes.filter((c) => teacherClasseIds.has(c.id));
-  }, [classes, isCenseur, isDirecteur, currentUser?.id, selectedAnnee.libelle]);
+  // Toutes les 28 classes sont consultables par TOUS les utilisateurs authentifiés
+  const allowedClasses = classes;
 
   const [selectedClasseId, setSelectedClasseId] = useState<string>(
-    allowedClasses.length > 0 ? allowedClasses[0].id : (classes[0]?.id || '')
+    classes[0]?.id || ''
   );
   const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>(activePeriode?.id || '');
 
+  // Synchroniser la période sélectionnée si la liste change
+  React.useEffect(() => {
+    if (periodes.length > 0 && !periodes.some((p) => p.id === selectedPeriodeId)) {
+      const active = periodes.find((p) => p.is_active) || periodes[0];
+      if (active) setSelectedPeriodeId(active.id);
+    }
+  }, [periodes, selectedPeriodeId]);
+
   const selectedClasse: Classe | undefined = classes.find((c) => c.id === selectedClasseId);
-  const selectedPeriode: Periode | undefined = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0];
+  const selectedPeriode: Periode | undefined = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0] || activePeriode;
 
   const eleves = selectedClasse ? storage.getElevesByClasse(selectedClasse.id, selectedAnnee.libelle) : [];
   const matieres = storage.getMatieres();
@@ -169,9 +172,9 @@ export const ClassementView: React.FC<ClassementViewProps> = ({ onOpenBulletin }
                 onChange={(e) => setSelectedPeriodeId(e.target.value)}
                 className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500"
               >
-                {periodes.map((p) => (
+                {periodes.filter(Boolean).map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nom} {p.is_locked ? '🔒' : '🔓'}
+                    {p.nom || p.code} {p?.is_locked ? '🔒' : '🔓'}
                   </option>
                 ))}
               </select>

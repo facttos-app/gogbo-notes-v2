@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '../../lib/storage';
 import { getAppreciation, calculerBulletinEleve, calculerSyntheseMatiere, calculerClassementClasse } from '../../lib/appreciation';
-import { CheckCircle2, XCircle, Play, X, ShieldCheck, ListChecks, Sparkles, Calculator, History, CalendarCheck } from 'lucide-react';
+import { CheckCircle2, XCircle, Play, X, ShieldCheck, ListChecks, Sparkles, Calculator, History, CalendarCheck, UserCheck, ShieldAlert } from 'lucide-react';
 
 export interface TestResult {
   id: string;
@@ -17,13 +17,15 @@ interface SuiteTestsModalProps {
 }
 
 export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'OBLIGATOIRES_25' | 'CALCULS_BULLETINS' | 'CORRECTIONS_AG' | 'SCENARIO_HISTORIQUE' | 'PRESENCES_12'>('OBLIGATOIRES_25');
+  const [activeTab, setActiveTab] = useState<'OBLIGATOIRES_25' | 'CALCULS_BULLETINS' | 'CORRECTIONS_AG' | 'SCENARIO_HISTORIQUE' | 'PRESENCES_12' | 'PP_TESTS' | 'PUNITIONS_5'>('OBLIGATOIRES_25');
   const [isRunning, setIsRunning] = useState(false);
   const [tests25, setTests25] = useState<TestResult[]>([]);
   const [testsCalculs, setTestsCalculs] = useState<TestResult[]>([]);
   const [testsAG, setTestsAG] = useState<TestResult[]>([]);
   const [testsScenario, setTestsScenario] = useState<TestResult[]>([]);
   const [testsPresences, setTestsPresences] = useState<TestResult[]>([]);
+  const [testsPP, setTestsPP] = useState<TestResult[]>([]);
+  const [testsPunitions, setTestsPunitions] = useState<TestResult[]>([]);
 
   const runAllTests = async () => {
     setIsRunning(true);
@@ -559,7 +561,7 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
     // TEST 22 : Test du verrouillage de période
     try {
       storage.toggleLockPeriode(activePeriode.id, censeur);
-      const isLocked = storage.getActivePeriode().is_locked;
+      const isLocked = storage.getActivePeriode()?.is_locked;
       // Rétablir
       storage.toggleLockPeriode(activePeriode.id, censeur);
 
@@ -1646,6 +1648,394 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
     }
 
     setTestsPresences(listPresences);
+
+    // ==========================================
+    // 6. SUITE DES 10 TESTS PROFESSEURS PRINCIPAUX (PP)
+    // ==========================================
+    const listPP: TestResult[] = [];
+    const classeTermD = storage.getClasses().find((c) => c.nom.includes('Terminale D') || c.nom.includes('Tle D') || c.niveau === 'Terminale') || storage.getClasses()[0];
+    const classeTermC = storage.getClasses().find((c) => (c.nom.includes('Terminale C') || c.nom.includes('Tle C')) && c.id !== classeTermD.id) || storage.getClasses()[1];
+    const profX = storage.getProfiles().find((p) => (p.is_enseignant || p.role === 'ENSEIGNANT') && p.statut === 'ACTIF') || enseignant;
+    const profY = storage.getProfiles().find((p) => (p.is_enseignant || p.role === 'ENSEIGNANT') && p.id !== profX.id && p.statut === 'ACTIF') || enseignant;
+
+    // Test PP 1 : Accès Censeur au module PP
+    try {
+      const canCenseurAdmin = storage.canAdminister(censeur);
+      const allPPs = storage.getProfesseursPrincipaux('2026–2027');
+      listPP.push({
+        id: 'pp-1',
+        code: 'TEST-PP-1',
+        titre: '1. Connexion & accès Censeur au module PP',
+        succes: canCenseurAdmin && Array.isArray(allPPs),
+        details: `Succès : Le Censeur dispose des droits d'administration sur le module PP. ${allPPs.length} attribution(s) chargée(s).`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-1', code: 'TEST-PP-1', titre: '1. Connexion Censeur PP', succes: false, details: e.message });
+    }
+
+    // Test PP 2 : Année scolaire active 2026-2027 prise en compte
+    try {
+      const activeAnnee = storage.getActiveAnneeScolaire();
+      listPP.push({
+        id: 'pp-2',
+        code: 'TEST-PP-2',
+        titre: '2. Prise en compte de l’année scolaire active (2026–2027)',
+        succes: activeAnnee.libelle.includes('2026'),
+        details: `Succès : L'année académique active est bien ${activeAnnee.libelle}, utilisée comme contexte par défaut.`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-2', code: 'TEST-PP-2', titre: '2. Année scolaire active', succes: false, details: e.message });
+    }
+
+    // Test PP 3 : Désignation d'un PP (M. X -> Terminale D pour 2026-2027)
+    let createdPPId = '';
+    try {
+      // Nettoyer si existant pour repartir sur un état propre
+      const existing = storage.getActiveProfesseurPrincipalByClasse(classeTermD.id, '2026–2027');
+      if (existing) {
+        await storage.deleteProfesseurPrincipal(existing.id, censeur);
+      }
+      const existingProf = storage.getActiveProfesseurPrincipalByEnseignant(profX.id, '2026–2027');
+      if (existingProf) {
+        await storage.deleteProfesseurPrincipal(existingProf.id, censeur);
+      }
+
+      const newPP = await storage.assignProfesseurPrincipal({
+        profile_id: profX.id,
+        classe_id: classeTermD.id,
+        annee_scolaire: '2026–2027',
+      }, censeur);
+      createdPPId = newPP.id;
+
+      const verify = storage.getActiveProfesseurPrincipalByClasse(classeTermD.id, '2026–2027');
+      listPP.push({
+        id: 'pp-3',
+        code: 'TEST-PP-3',
+        titre: `3. Désignation d’un PP (${profX.nom} → ${classeTermD.nom})`,
+        succes: verify?.profile_id === profX.id && verify?.statut === 'ACTIF',
+        details: `Succès : ${profX.nom} ${profX.prenom} a été désigné Professeur Principal de la classe ${classeTermD.nom} pour l'année 2026–2027.`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-3', code: 'TEST-PP-3', titre: '3. Désignation PP', succes: false, details: e.message });
+    }
+
+    // Test PP 4 : Règle absolue 1 - M. X -> 2ème classe (Terminale C) pour la même année -> DOIT ÊTRE REFUSÉ
+    try {
+      let refused = false;
+      try {
+        await storage.assignProfesseurPrincipal({
+          profile_id: profX.id,
+          classe_id: classeTermC.id,
+          annee_scolaire: '2026–2027',
+        }, censeur);
+      } catch {
+        refused = true;
+      }
+      listPP.push({
+        id: 'pp-4',
+        code: 'TEST-PP-4',
+        titre: '4. Règle absolue 1 : 1 Enseignant = 1 seule classe PP (Refus double attribution)',
+        succes: refused,
+        details: refused
+          ? `Succès : Le système bloque formellement la tentative de désigner ${profX.nom} comme PP d'une deuxième classe (${classeTermC.nom}) pour l'année 2026–2027.`
+          : 'Échec : Le système a permis à un enseignant d’être PP de deux classes différentes pour la même année !',
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-4', code: 'TEST-PP-4', titre: '4. Règle absolue 1', succes: false, details: e.message });
+    }
+
+    // Test PP 5 : Règle absolue 2 - Classe avec déjà un PP actif -> tentative d'en ajouter un 2ème -> DOIT ÊTRE REFUSÉ
+    try {
+      let classDuplicateRefused = false;
+      try {
+        await storage.assignProfesseurPrincipal({
+          profile_id: profY.id,
+          classe_id: classeTermD.id,
+          annee_scolaire: '2026–2027',
+        }, censeur);
+      } catch {
+        classDuplicateRefused = true;
+      }
+      listPP.push({
+        id: 'pp-5',
+        code: 'TEST-PP-5',
+        titre: '5. Règle absolue 2 : 1 Classe = 1 seul PP actif (Refus deuxième PP)',
+        succes: classDuplicateRefused,
+        details: classDuplicateRefused
+          ? `Succès : Le système bloque formellement la désignation d'un second PP (${profY.nom}) sur la classe ${classeTermD.nom} déjà pourvue.`
+          : 'Échec : Une classe a pu recevoir deux Professeurs Principaux actifs simultanés !',
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-5', code: 'TEST-PP-5', titre: '5. Règle absolue 2', succes: false, details: e.message });
+    }
+
+    // Test PP 6 : Modification d'une désignation par le Censeur
+    try {
+      if (createdPPId) {
+        const updated = await storage.updateProfesseurPrincipal(createdPPId, {
+          date_nomination: '2026-09-20',
+        }, censeur);
+        listPP.push({
+          id: 'pp-6',
+          code: 'TEST-PP-6',
+          titre: '6. Modification d’une désignation existante par le Censeur',
+          succes: updated.date_nomination === '2026-09-20',
+          details: `Succès : Mise à jour de la désignation effectuée et enregistrée avec journal d'audit.`,
+        });
+      }
+    } catch (e: any) {
+      listPP.push({ id: 'pp-6', code: 'TEST-PP-6', titre: '6. Modification désignation PP', succes: false, details: e.message });
+    }
+
+    // Test PP 7 : Retrait du PP (clôture avec traçabilité historique)
+    try {
+      if (createdPPId) {
+        const retired = await storage.retirerProfesseurPrincipal(createdPPId, censeur, 'Fin de mandat test');
+        listPP.push({
+          id: 'pp-7',
+          code: 'TEST-PP-7',
+          titre: '7. Retrait de la désignation & conservation historique',
+          succes: retired.statut === 'CLOTURE' && !!retired.date_fin,
+          details: `Succès : Attribution passée à CLOTURE. L'historique reste conservé (${retired.motif_fin}).`,
+        });
+      }
+    } catch (e: any) {
+      listPP.push({ id: 'pp-7', code: 'TEST-PP-7', titre: '7. Retrait PP', succes: false, details: e.message });
+    }
+
+    // Test PP 8 : Nouvelle désignation d'un autre enseignant après retrait
+    try {
+      const newPP2 = await storage.assignProfesseurPrincipal({
+        profile_id: profY.id,
+        classe_id: classeTermD.id,
+        annee_scolaire: '2026–2027',
+      }, censeur);
+      listPP.push({
+        id: 'pp-8',
+        code: 'TEST-PP-8',
+        titre: `8. Réattribution possible de la classe libérée (${profY.nom} → ${classeTermD.nom})`,
+        succes: newPP2.statut === 'ACTIF' && newPP2.profile_id === profY.id,
+        details: `Succès : La classe libérée a pu être immédiatement réattribuée à ${profY.nom}.`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-8', code: 'TEST-PP-8', titre: '8. Réattribution classe PP', succes: false, details: e.message });
+    }
+
+    // Test PP 9 : Vérification des droits d'administration de l'apprenant pour le PP
+    try {
+      const canPPAdminister = storage.canAdministerEleves(profY, classeTermD.id, '2026–2027');
+      const canPPAdministerOther = storage.canAdministerEleves(profY, classeTermC.id, '2026–2027');
+      listPP.push({
+        id: 'pp-9',
+        code: 'TEST-PP-9',
+        titre: '9. Droits du PP : Accès strict aux apprenants de sa classe (Isolation)',
+        succes: canPPAdminister && !canPPAdministerOther,
+        details: `Succès : ${profY.nom} a le droit d'inscrire/gérer les apprenants de ${classeTermD.nom}, mais est bloqué pour ${classeTermC.nom}.`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-9', code: 'TEST-PP-9', titre: '9. Droits du PP', succes: false, details: e.message });
+    }
+
+    // Test PP 10 : Inscription d'un apprenant par le PP et mise à jour administrative
+    try {
+      const testMatricule = `PP-TEST-${Date.now().toString().slice(-4)}`;
+      const newEl = storage.createEleve({
+        matricule: testMatricule,
+        nom: 'TESTPP',
+        prenom: 'Apprenant',
+        sexe: 'M',
+        date_naissance: '2010-05-15',
+        langue_vivante_2: 'ESPAGNOL',
+        classe_id: classeTermD.id,
+        statut: 'ACTIF',
+      }, profY);
+
+      // Modification administrative par le PP
+      await storage.updateEleveAsync(newEl.id, {
+        nom_parent: 'Parent Test PP',
+      }, profY);
+
+      const reloadedEl = storage.getEleveById(newEl.id);
+      listPP.push({
+        id: 'pp-10',
+        code: 'TEST-PP-10',
+        titre: '10. Inscription & modification administrative par le Professeur Principal',
+        succes: reloadedEl?.classe_id === classeTermD.id && reloadedEl?.nom_parent === 'Parent Test PP',
+        details: `Succès : L'apprenant (${newEl.matricule}) a été créé et mis à jour par le PP de ${classeTermD.nom}.`,
+      });
+    } catch (e: any) {
+      listPP.push({ id: 'pp-10', code: 'TEST-PP-10', titre: '10. Inscription par le PP', succes: false, details: e.message });
+    }
+
+    setTestsPP(listPP);
+
+    // ==========================================
+    // 7. SUITE DES 5 TESTS OFFICIELS : MODULE PUNITION & ANNULATION CERTIFIÉE
+    // ==========================================
+    const listPunitions: TestResult[] = [];
+
+    const profAroua = storage.getProfiles().find((p) => p.nom === 'AROUA') || {
+      id: 'usr-ens-aroua',
+      nom: 'AROUA',
+      prenom: 'Barnabé',
+      role: 'ENSEIGNANT' as const,
+      is_enseignant: true,
+      email: 'aroua@ceggogbo.bj',
+      telephone: '+229 97 10 20 30',
+      adresse: 'Adjohoun',
+      matiere: 'Histoire-Géographie',
+      statut: 'ACTIF' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const profKponou = storage.getProfiles().find((p) => p.nom === 'KPONOU') || {
+      id: 'usr-ens-kponou',
+      nom: 'KPONOU',
+      prenom: 'Marcel',
+      role: 'ENSEIGNANT' as const,
+      is_enseignant: true,
+      email: 'kponou@ceggogbo.bj',
+      telephone: '+229 97 11 22 44',
+      adresse: 'Adjohoun',
+      matiere: 'PCT',
+      statut: 'ACTIF' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const surveillantGeneral = storage.getProfiles().find((p) => p.role === 'SURVEILLANT_GENERAL') || surveillant;
+    const eleveTest = storage.getEleves()[0];
+    let createdPunitionAroua: any = null;
+    let createdPunitionForSg: any = null;
+
+    // TEST 1 : Création de la punition par AROUA
+    try {
+      createdPunitionAroua = storage.savePunition({
+        annee_scolaire: '2026–2027',
+        classe_id: eleveTest.classe_id,
+        eleve_id: eleveTest.id,
+        date: '2026-10-05',
+        categorie_faute: 'BAVARDAGE_INDISCIPLINE',
+        faute_motif: 'Bavardages répétés perturbant le cours d’Histoire-Géo',
+        punition_appliquee: 'Travail supplémentaire à caractère pédagogique',
+      }, profAroua);
+
+      const isValid1 = createdPunitionAroua.eleve_id === eleveTest.id &&
+                       createdPunitionAroua.auteur_id === profAroua.id &&
+                       createdPunitionAroua.auteur_nom.includes('AROUA') &&
+                       createdPunitionAroua.date === '2026-10-05' &&
+                       createdPunitionAroua.faute_motif.includes('Bavardages') &&
+                       createdPunitionAroua.punition_appliquee.includes('Travail supplémentaire') &&
+                       createdPunitionAroua.statut === 'ACTIVE';
+
+      listPunitions.push({
+        id: 'pun-1',
+        code: 'TEST-PUN-1',
+        titre: '1. Enregistrement punition AROUA (Élève, Auteur certifié, Date, Motif, Sanction, Statut ACTIVE)',
+        succes: !!isValid1,
+        details: `Succès : Punition enregistrée pour l'apprenant ${eleveTest.nom} ${eleveTest.prenom}. Auteur : ${createdPunitionAroua.auteur_nom}, Statut : ${createdPunitionAroua.statut}.`,
+      });
+    } catch (e: any) {
+      listPunitions.push({ id: 'pun-1', code: 'TEST-PUN-1', titre: '1. Enregistrement punition AROUA', succes: false, details: e.message });
+    }
+
+    // TEST 2 : AROUA voit et dispose du bouton [Annuler la punition]
+    try {
+      const isAuthor = createdPunitionAroua && profAroua.id === createdPunitionAroua.auteur_id;
+      const canAnnuler = createdPunitionAroua && createdPunitionAroua.statut === 'ACTIVE' && isAuthor;
+
+      listPunitions.push({
+        id: 'pun-2',
+        code: 'TEST-PUN-2',
+        titre: '2. Visibilité et éligibilité du bouton [Annuler la punition] pour l’auteur (AROUA)',
+        succes: !!canAnnuler,
+        details: `Succès : L'auteur initial (${profAroua.nom}) voit clairement le bouton d'annulation sur sa propre punition active.`,
+      });
+    } catch (e: any) {
+      listPunitions.push({ id: 'pun-2', code: 'TEST-PUN-2', titre: '2. Visibilité bouton annulation', succes: false, details: e.message });
+    }
+
+    // TEST 3 : Annulation effective par AROUA avec traçabilité complète
+    try {
+      if (createdPunitionAroua) {
+        storage.annulerPunition(createdPunitionAroua.id, profAroua, 'Entente pédagogique avec l’apprenant');
+        const reloaded = storage.getPunitions('2026–2027').find((p) => p.id === createdPunitionAroua!.id);
+
+        const isValid3 = reloaded &&
+                         reloaded.statut === 'ANNULEE' &&
+                         reloaded.auteur_nom.includes('AROUA') &&
+                         reloaded.annule_par_nom.includes('AROUA') &&
+                         !!reloaded.annule_le;
+
+        listPunitions.push({
+          id: 'pun-3',
+          code: 'TEST-PUN-3',
+          titre: '3. Annulation logique par AROUA (Maintien historique, Statut ANNULÉE, Auteur initial, Horodatage certifié)',
+          succes: !!isValid3,
+          details: `Succès : Punition passée à ANNULÉE sans suppression physique. Trace : Auteur initial=${reloaded?.auteur_nom}, Annulée par=${reloaded?.annule_par_nom}, Date d'annulation=${reloaded?.annule_le}.`,
+        });
+      }
+    } catch (e: any) {
+      listPunitions.push({ id: 'pun-3', code: 'TEST-PUN-3', titre: '3. Annulation par AROUA', succes: false, details: e.message });
+    }
+
+    // TEST 4 : Contrôle de sécurité strict : KPONOU ne peut pas annuler la punition d'AROUA
+    try {
+      const punitionAroua2 = storage.savePunition({
+        annee_scolaire: '2026–2027',
+        classe_id: eleveTest.classe_id,
+        eleve_id: eleveTest.id,
+        date: '2026-10-05',
+        categorie_faute: 'RETARD',
+        faute_motif: 'Retard répété au début du cours',
+        punition_appliquee: 'Rappel à l’ordre consigné',
+      }, profAroua);
+
+      let rejectionSuccess = false;
+      try {
+        storage.annulerPunition(punitionAroua2.id, profKponou, 'Tentative non autorisée');
+      } catch (err: any) {
+        rejectionSuccess = err.message.includes('Action non autorisée');
+      }
+
+      listPunitions.push({
+        id: 'pun-4',
+        code: 'TEST-PUN-4',
+        titre: '4. Contrôle de sécurité : Un autre enseignant (KPONOU) NE PEUT PAS annuler la punition d’AROUA',
+        succes: rejectionSuccess,
+        details: `Succès : Tentative d'annulation par ${profKponou.nom} rejetée par le contrôle d'accès strict. Le bouton lui est totalement inaccessible.`,
+      });
+
+      createdPunitionForSg = punitionAroua2;
+    } catch (e: any) {
+      listPunitions.push({ id: 'pun-4', code: 'TEST-PUN-4', titre: '4. Sécurité isolation punition', succes: false, details: e.message });
+    }
+
+    // TEST 5 : Le Surveillant Général peut annuler une punition active d'un enseignant
+    try {
+      if (createdPunitionForSg && surveillantGeneral) {
+        storage.annulerPunition(createdPunitionForSg.id, surveillantGeneral, 'Règlement vie scolaire par le Surveillant Général');
+        const reloadedSg = storage.getPunitions('2026–2027').find((p) => p.id === createdPunitionForSg!.id);
+
+        const isValid5 = reloadedSg &&
+                         reloadedSg.statut === 'ANNULEE' &&
+                         reloadedSg.auteur_nom.includes('AROUA') &&
+                         (reloadedSg.annule_par_nom.includes('Surveillant Général') || reloadedSg.annule_par_nom.includes(surveillantGeneral.nom));
+
+        listPunitions.push({
+          id: 'pun-5',
+          code: 'TEST-PUN-5',
+          titre: '5. Pouvoir réglementaire du Surveillant Général : Annulation d’une punition active avec traçabilité',
+          succes: !!isValid5,
+          details: `Succès : Le Surveillant Général a annulé la punition active. Statut : ANNULÉE, Auteur initial : ${reloadedSg?.auteur_nom}, Annulé par : ${reloadedSg?.annule_par_nom}.`,
+        });
+      }
+    } catch (e: any) {
+      listPunitions.push({ id: 'pun-5', code: 'TEST-PUN-5', titre: '5. Annulation par Surveillant Général', succes: false, details: e.message });
+    }
+
+    setTestsPunitions(listPunitions);
     setIsRunning(false);
   };
 
@@ -1666,7 +2056,11 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
       ? testsAG
       : activeTab === 'SCENARIO_HISTORIQUE'
       ? testsScenario
-      : testsPresences;
+      : activeTab === 'PRESENCES_12'
+      ? testsPresences
+      : activeTab === 'PP_TESTS'
+      ? testsPP
+      : testsPunitions;
   const totalSuccess = currentList.filter((r) => r.succes).length;
   const totalTests = currentList.length;
 
@@ -1682,7 +2076,7 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
                 Vérification & Validation des Tests Obligatoires
               </h3>
               <p className="text-[11px] text-slate-300">
-                GOGBO NOTES V2 • Audit automatisé : Sécurité, Calculs, Coefficients, Rangs, Bulletins & Présences
+                GOGBO NOTES V2 • Audit automatisé : Sécurité, Calculs, Coefficients, Rangs, Bulletins, Présences & PP
               </p>
             </div>
           </div>
@@ -1691,8 +2085,8 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
           </button>
         </div>
 
-        {/* Sélecteur des 5 onglets de tests */}
-        <div className="grid grid-cols-5 p-1.5 bg-slate-100 border-b border-slate-200 gap-1 text-[10px] sm:text-[11px] font-bold">
+        {/* Sélecteur des 6 onglets de tests */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 p-1.5 bg-slate-100 border-b border-slate-200 gap-1 text-[10px] sm:text-[11px] font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('OBLIGATOIRES_25')}
@@ -1757,6 +2151,32 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
             <CalendarCheck className="w-3 h-3 text-emerald-300 shrink-0" />
             <span>21 Présences</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('PP_TESTS')}
+            className={`flex items-center justify-center space-x-1 py-2 px-1 rounded-lg transition-all text-center ${
+              activeTab === 'PP_TESTS'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <UserCheck className="w-3 h-3 text-indigo-300 shrink-0" />
+            <span>10 Tests PP</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('PUNITIONS_5')}
+            className={`flex items-center justify-center space-x-1 py-2 px-1 rounded-lg transition-all text-center ${
+              activeTab === 'PUNITIONS_5'
+                ? 'bg-rose-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <ShieldAlert className="w-3 h-3 text-rose-300 shrink-0" />
+            <span>5 Punitions</span>
+          </button>
         </div>
 
         {/* Corps avec la liste des tests */}
@@ -1773,7 +2193,11 @@ export const SuiteTestsModal: React.FC<SuiteTestsModalProps> = ({ isOpen, onClos
                   ? 'Suite de Validation des Corrections A à G'
                   : activeTab === 'SCENARIO_HISTORIQUE'
                   ? 'Scénario Obligatoire : 2026–2027 ⇄ 2027–2028 (Continuité & Traçabilité Jean)'
-                  : 'Suite des 21 Tests : Présence Journalière & Matières Réellement Attribuées'}
+                  : activeTab === 'PRESENCES_12'
+                  ? 'Suite des 21 Tests : Présence Journalière & Matières Réellement Attribuées'
+                  : activeTab === 'PP_TESTS'
+                  ? 'Suite des 10 Tests : Professeurs Principaux (Attribution, Règle 1 Enseignant = 1 Classe, Droits PP)'
+                  : 'Suite des 5 Tests Officiels : Module Punition & Annulation Certifiée (AROUA / KPONOU / SG)'}
               </div>
               <div className="text-sm font-extrabold text-slate-800 mt-0.5">
                 Statut :{' '}

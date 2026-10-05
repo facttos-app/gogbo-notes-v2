@@ -211,6 +211,7 @@ export function calculerBulletinEleve(
   totalAbsences?: number,
   estAbandon?: boolean
 ): BulletinEleve {
+  const safeNotes = notesEleve || [];
   const matieresNotes: NoteSyntheseMatiere[] = [];
   let totalPoints = 0;
   let totalCoefficients = 0;
@@ -231,7 +232,7 @@ export function calculerBulletinEleve(
       ? new Set(affectations.filter((a) => a.matiere_id === mat.id).map((a) => a.id))
       : null;
 
-    const notesMatiere = notesEleve.filter((n) => {
+    const notesMatiere = safeNotes.filter((n) => {
       const matchPeriode = n.periode_id === periode.id;
       if (!matchPeriode) return false;
       if (validAffIds) return validAffIds.has(n.affectation_id);

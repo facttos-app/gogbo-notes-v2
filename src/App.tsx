@@ -16,6 +16,8 @@ import { PresenceEnseignants } from './components/censeur/PresenceEnseignants';
 import { GestionEleves } from './components/censeur/GestionEleves';
 import { GestionEnseignants } from './components/censeur/GestionEnseignants';
 import { GestionAffectations } from './components/censeur/GestionAffectations';
+import { GestionProfesseursPrincipaux } from './components/censeur/GestionProfesseursPrincipaux';
+import { EspaceProfesseurPrincipal } from './components/pedagogique/EspaceProfesseurPrincipal';
 import { GestionClasses } from './components/censeur/GestionClasses';
 import { GestionMatieres } from './components/censeur/GestionMatieres';
 import { GestionPeriodes } from './components/censeur/GestionPeriodes';
@@ -25,38 +27,95 @@ import { HistoriqueAnneesScolaires } from './components/censeur/HistoriqueAnnees
 import { DirecteurDashboard } from './components/directeur/DirecteurDashboard';
 import { SurveillantDashboard } from './components/surveillant/SurveillantDashboard';
 import { ComptableDashboard } from './components/comptable/ComptableDashboard';
+import { GestionParents } from './components/censeur/GestionParents';
+import { EspaceParent } from './components/parents/EspaceParent';
+import { ResultatsStatistiques } from './components/censeur/ResultatsStatistiques';
 import { ClassementView } from './components/pedagogique/ClassementView';
 import { BulletinView } from './components/pedagogique/BulletinView';
 import { HomePage } from './components/home/HomePage';
 import { SuiteTestsModal } from './components/modals/SuiteTestsModal';
 import { SqlSchemaModal } from './components/modals/SqlSchemaModal';
 import { MonCompteModal } from './components/modals/MonCompteModal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ArrowLeft } from 'lucide-react';
+
+const TAB_TITLES: Record<TabKey, string> = {
+  censeur_dashboard: 'Tableau de bord Direction',
+  presence_enseignants: 'Présence Enseignants',
+  resultats_statistiques: 'Résultats Statistiques & Bilans',
+  pedagogique: 'Espace Pédagogique & Notes',
+  professeur_principal_espace: 'Espace Professeur Principal',
+  classement: 'Classement Général',
+  bulletins: 'Bulletins Scolaires Officiels',
+  eleves: 'Gestion des Apprenants',
+  parents: 'Gestion des Parents d’Élèves',
+  espace_parent: 'Espace Famille & Suivi Parental',
+  enseignants: 'Corps Enseignant',
+  affectations: 'Attribution de Classes & Matières',
+  professeurs_principaux: 'Désignation des Professeurs Principaux',
+  classes: 'Divisions & Classes Pédagogiques',
+  matieres: 'Matières & Coefficients',
+  periodes: 'Périodes Scolaires',
+  audit: 'Journal d’Audit Réglementaire',
+  parametres: 'Paramètres de l’Établissement',
+  directeur_stats: 'Supervision Direction Générale',
+  surveillant: 'Discipline, Présences & Punitions',
+  comptable: 'Comptabilité & Versements Scolaires',
+  historique_annees: 'Archives & Historique des Années',
+};
 
 const MainAppContent: React.FC = () => {
   const { currentUser, isCenseur, isDirecteur, isConcepteur, isSurveillant, isComptable, isLoading } = useAuth();
-  const [currentTab, setCurrentTab] = useState<TabKey>('censeur_dashboard');
+  const getDefaultTab = (user: typeof currentUser): TabKey => {
+    if (!user) return 'censeur_dashboard';
+    if (user.role === 'PARENT') return 'espace_parent';
+    if (user.role === 'DIRECTEUR_GENERAL') return 'directeur_stats';
+    if (user.role === 'SURVEILLANT_GENERAL') return 'surveillant';
+    if (user.role === 'COMPTABLE') return 'comptable';
+    if (user.role === 'CENSEUR' || user.role === 'CONCEPTEUR') return 'censeur_dashboard';
+    return 'pedagogique';
+  };
+
+  const [currentTab, setCurrentTab] = useState<TabKey>(() => getDefaultTab(currentUser));
+  const [tabHistory, setTabHistory] = useState<TabKey[]>(() => [getDefaultTab(currentUser)]);
   const [bulletinTarget, setBulletinTarget] = useState<{ eleveId?: string; classeId?: string; periodeId?: string } | null>(null);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [isMonCompteOpen, setIsMonCompteOpen] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
+  // Afficher par défaut la page de connexion officielle (Portails Admin & Enseignant & Parent)
+  const [showLogin, setShowLogin] = useState(true);
 
-  // Mettre à jour l'onglet par défaut lorsque le rôle de l'utilisateur change
+  // Mettre à jour l'onglet par défaut et réinitialiser l'historique lorsque l'utilisateur change
   useEffect(() => {
     if (!currentUser) return;
-
-    if (isCenseur || isConcepteur) {
-      setCurrentTab('censeur_dashboard');
-    } else if (isDirecteur) {
-      setCurrentTab('directeur_stats');
-    } else if (isSurveillant) {
-      setCurrentTab('surveillant');
-    } else if (isComptable) {
-      setCurrentTab('comptable');
-    } else {
-      setCurrentTab('pedagogique');
-    }
+    const def = getDefaultTab(currentUser);
+    setCurrentTab(def);
+    setTabHistory([def]);
   }, [currentUser?.id, currentUser?.role]);
+
+  // Navigation avec enregistrement précis dans l'historique
+  const handleNavigate = (newTab: TabKey) => {
+    if (newTab === currentTab) return;
+    setTabHistory((prev) => [...prev, newTab]);
+    setCurrentTab(newTab);
+  };
+
+  // Revenir fidèlement à la page précédemment visitée (Exigence 2)
+  const handleGoBack = () => {
+    if (tabHistory.length > 1) {
+      const nextHistory = tabHistory.slice(0, -1);
+      const previousTab = nextHistory[nextHistory.length - 1];
+      setTabHistory(nextHistory);
+      setCurrentTab(previousTab);
+    } else {
+      // Secours cohérent : retour à l'espace d'accueil naturel du profil
+      const def = getDefaultTab(currentUser);
+      setTabHistory([def]);
+      setCurrentTab(def);
+    }
+  };
+
+  const canGoBack = tabHistory.length > 1 || currentTab !== getDefaultTab(currentUser);
 
   if (isLoading) {
     return (
@@ -79,15 +138,17 @@ const MainAppContent: React.FC = () => {
   const renderTabContent = () => {
     switch (currentTab) {
       case 'censeur_dashboard':
-        return <DashboardCenseur onNavigate={setCurrentTab} />;
+        return <DashboardCenseur onNavigate={handleNavigate} />;
       case 'presence_enseignants':
         return <PresenceEnseignants />;
+      case 'resultats_statistiques':
+        return <ResultatsStatistiques />;
       case 'pedagogique':
         return (
           <EspacePedagogique 
             onOpenBulletin={(eleveId, classeId, periodeId) => {
               setBulletinTarget({ eleveId, classeId, periodeId });
-              setCurrentTab('bulletins');
+              handleNavigate('bulletins');
             }}
           />
         );
@@ -96,7 +157,7 @@ const MainAppContent: React.FC = () => {
           <ClassementView 
             onOpenBulletin={(eleveId, classeId, periodeId) => {
               setBulletinTarget({ eleveId, classeId, periodeId });
-              setCurrentTab('bulletins');
+              handleNavigate('bulletins');
             }}
           />
         );
@@ -114,6 +175,14 @@ const MainAppContent: React.FC = () => {
         return <GestionEnseignants />;
       case 'affectations':
         return <GestionAffectations />;
+      case 'professeurs_principaux':
+        return (
+          <GestionProfesseursPrincipaux 
+            onBack={handleGoBack} 
+          />
+        );
+      case 'professeur_principal_espace':
+        return <EspaceProfesseurPrincipal onBack={handleGoBack} />;
       case 'classes':
         return <GestionClasses />;
       case 'matieres':
@@ -127,19 +196,23 @@ const MainAppContent: React.FC = () => {
       case 'historique_annees':
         return (
           <HistoriqueAnneesScolaires
-            onNavigate={setCurrentTab}
+            onNavigate={handleNavigate}
             onOpenBulletin={(eleveId, classeId, periodeId) => {
               setBulletinTarget({ eleveId, classeId, periodeId });
-              setCurrentTab('bulletins');
+              handleNavigate('bulletins');
             }}
           />
         );
       case 'directeur_stats':
-        return <DirecteurDashboard onNavigate={setCurrentTab} />;
+        return <DirecteurDashboard onNavigate={handleNavigate} />;
       case 'surveillant':
-        return <SurveillantDashboard onNavigate={setCurrentTab} />;
+        return <SurveillantDashboard onNavigate={handleNavigate} />;
       case 'comptable':
-        return <ComptableDashboard onNavigate={setCurrentTab} />;
+        return <ComptableDashboard onNavigate={handleNavigate} />;
+      case 'parents':
+        return <GestionParents />;
+      case 'espace_parent':
+        return <EspaceParent />;
       default:
         return <EspacePedagogique />;
     }
@@ -157,12 +230,30 @@ const MainAppContent: React.FC = () => {
       {/* Barre de navigation dynamique selon le profil avec déconnexion à gauche */}
       <Navigation 
         currentTab={currentTab} 
-        onSelectTab={setCurrentTab} 
+        onSelectTab={handleNavigate} 
         onOpenMonCompte={() => setIsMonCompteOpen(true)}
       />
 
-      {/* Corps principal */}
+      {/* Corps principal avec Bouton Retour universel et intelligent (Exigence 2) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        {canGoBack && (
+          <div className="mb-3.5 flex items-center justify-between">
+            <button
+              id="btn-retour-navigation"
+              type="button"
+              onClick={handleGoBack}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-slate-400 text-slate-700 hover:text-slate-900 hover:bg-slate-50 text-xs sm:text-sm font-bold shadow-2xs transition-all cursor-pointer group"
+              title="Revenir à la page précédente"
+            >
+              <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
+              <span>← Retour</span>
+            </button>
+            <div className="text-[11px] text-slate-500 hidden sm:flex items-center space-x-1.5 bg-slate-200/60 px-2.5 py-1 rounded-md">
+              <span className="text-slate-400">Espace :</span>
+              <span className="font-semibold text-slate-700">{TAB_TITLES[currentTab] || currentTab}</span>
+            </div>
+          </div>
+        )}
         {renderTabContent()}
       </main>
 
@@ -201,10 +292,12 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AnneeProvider>
-        <MainAppContent />
-      </AnneeProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AnneeProvider>
+          <MainAppContent />
+        </AnneeProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

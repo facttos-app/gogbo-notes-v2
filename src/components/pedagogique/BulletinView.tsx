@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAnnee } from '../../context/AnneeContext';
 import { storage } from '../../lib/storage';
@@ -40,17 +40,12 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
   const { selectedAnnee, annees } = useAnnee();
 
   const classes = storage.getClasses();
-  const periodes = storage.getPeriodes().filter((p) => p.annee_scolaire === selectedAnnee.libelle);
+  const periodes = storage.getPeriodesByAnnee(selectedAnnee?.libelle);
   const activePeriode = periodes.find((p) => p.is_active) || periodes[0] || storage.getActivePeriode();
   const parametres: ParametresEcole = storage.getParametres();
 
-  // Filtrage des classes autorisées selon les attributions
-  const allowedClasses = React.useMemo(() => {
-    if (isCenseur || isDirecteur) return classes;
-    const teacherAffs = storage.getAffectationsByProfile(currentUser?.id || '', selectedAnnee.libelle);
-    const teacherClasseIds = new Set(teacherAffs.map((a) => a.classe_id));
-    return classes.filter((c) => teacherClasseIds.has(c.id));
-  }, [classes, isCenseur, isDirecteur, currentUser?.id, selectedAnnee.libelle]);
+  // Toutes les 28 classes sont consultables par TOUS les utilisateurs authentifiés (Censeur, Concepteur, DG, Surveillant, Comptable, Enseignants)
+  const allowedClasses = classes;
 
   const [selectedClasseId, setSelectedClasseId] = useState<string>(
     initialClasseId && allowedClasses.some((c) => c.id === initialClasseId)
@@ -62,11 +57,19 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
     initialPeriodeId || activePeriode?.id || ''
   );
 
+  // Synchroniser la période sélectionnée si la liste change
+  useEffect(() => {
+    if (periodes.length > 0 && !periodes.some((p) => p.id === selectedPeriodeId)) {
+      const active = periodes.find((p) => p.is_active) || periodes[0];
+      if (active) setSelectedPeriodeId(active.id);
+    }
+  }, [periodes, selectedPeriodeId]);
+
   // Type de bulletin : Périodique (Semestre / Trimestre) ou Annuel (Synthèse S1 & S2)
   const [bulletinType, setBulletinType] = useState<'PERIODIQUE' | 'ANNUEL'>('PERIODIQUE');
 
   const selectedClasse = classes.find((c) => c.id === selectedClasseId);
-  const selectedPeriode = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0];
+  const selectedPeriode = periodes.find((p) => p.id === selectedPeriodeId) || periodes[0] || activePeriode;
 
   const eleves: Eleve[] = selectedClasse ? storage.getElevesByClasse(selectedClasse.id, selectedAnnee.libelle) : [];
 
@@ -286,9 +289,9 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                   onChange={(e) => setSelectedPeriodeId(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500"
                 >
-                  {periodes.map((p) => (
+                  {periodes.filter(Boolean).map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.nom} {p.is_locked ? '(Clôturé)' : '(Actif)'}
+                      {p.nom || p.code} {p?.is_locked ? '(Clôturé)' : '(Actif)'}
                     </option>
                   ))}
                 </select>
@@ -535,6 +538,58 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                   </div>
                 </div>
 
+                {/* ZONE ASSIDUITÉ & NOTE DE CONDUITE (ATTRIBUTION STRICTE PROFESSEUR PRINCIPAL) */}
+                {(() => {
+                  const nc = storage.getNoteConduiteEleve(eleve.id, selectedPeriode.id, selectedAnnee.libelle);
+                  const absences = storage.getPresencesByEleve(eleve.id, selectedAnnee.libelle);
+                  const absNonJust = absences.filter(p => p.statut === 'ABSENT' && !p.justifie).length;
+                  const absJust = absences.filter(p => p.statut === 'ABSENT' && p.justifie).length;
+                  const retardsCount = absences.filter(p => p.statut === 'RETARD').length;
+
+                  return (
+                    <div className="border border-slate-900 p-3 mb-4 font-serif text-xs bg-slate-50/30 print:bg-transparent">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
+                            DISCIPLINE & NOTE DE CONDUITE (Professeur Principal)
+                          </span>
+                          <div className="flex justify-between items-center pt-1">
+                            <span>Note de Conduite Officielle :</span>
+                            <strong className="font-mono text-sm font-black text-slate-900">
+                              {nc ? `${nc.note.toFixed(1)} / 20` : 'En attente de saisie'}
+                            </strong>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span>Appréciation de conduite :</span>
+                            <strong className="italic text-slate-800">{nc?.appreciation || '—'}</strong>
+                          </div>
+                          <div className="text-[10px] text-slate-500 pt-0.5">
+                            Attribuée souverainement par le Professeur Principal • Sans coefficient matière
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 sm:border-l sm:border-slate-300 sm:pl-4">
+                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
+                            ASSIDUITÉ & VIE SCOLAIRE (Surveillance Générale)
+                          </span>
+                          <div className="flex justify-between pt-1">
+                            <span>Absences justifiées :</span>
+                            <strong>{absJust}</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Absences non justifiées :</span>
+                            <strong className={absNonJust > 0 ? 'text-red-700 font-bold' : ''}>{absNonJust}</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Retards constatés :</span>
+                            <strong>{retardsCount}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
                 <div className="border border-slate-900 p-4 font-serif text-xs">
                   <div className="mb-4">
@@ -718,6 +773,55 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* ZONE ASSIDUITÉ & CONDUITE ANNUELLE */}
+                {(() => {
+                  const absences = storage.getPresencesByEleve(eleve.id, bulletinAnnuel.annee_scolaire);
+                  const absNonJust = absences.filter(p => p.statut === 'ABSENT' && !p.justifie).length;
+                  const absJust = absences.filter(p => p.statut === 'ABSENT' && p.justifie).length;
+                  const retardsCount = absences.filter(p => p.statut === 'RETARD').length;
+                  const allNc = storage.getNotesConduite(bulletinAnnuel.annee_scolaire).filter(n => n.eleve_id === eleve.id);
+                  const moyConduite = allNc.length > 0 ? (allNc.reduce((acc, curr) => acc + curr.note, 0) / allNc.length) : null;
+
+                  return (
+                    <div className="border border-slate-900 p-3 mb-4 font-serif text-xs bg-slate-50/30 print:bg-transparent">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
+                            SYNTHÈSE DE LA CONDUITE ANNUELLE (Professeur Principal)
+                          </span>
+                          <div className="flex justify-between items-center pt-1">
+                            <span>Moyenne de conduite annuelle :</span>
+                            <strong className="font-mono text-sm font-black text-slate-900">
+                              {moyConduite !== null ? `${moyConduite.toFixed(1)} / 20` : 'En attente'}
+                            </strong>
+                          </div>
+                          <div className="text-[10px] text-slate-500 pt-0.5">
+                            Évaluation globale de l'attitude et de la discipline scolaire de l'apprenant.
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 sm:border-l sm:border-slate-300 sm:pl-4">
+                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
+                            BILAN ANNUEL D'ASSIDUITÉ (Surveillance Générale)
+                          </span>
+                          <div className="flex justify-between pt-1">
+                            <span>Total absences justifiées :</span>
+                            <strong>{absJust}</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Total absences non justifiées :</span>
+                            <strong className={absNonJust > 0 ? 'text-red-700 font-bold' : ''}>{absNonJust}</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Total retards constatés :</span>
+                            <strong>{retardsCount}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
                 <div className="border border-slate-900 p-4 font-serif text-xs">
