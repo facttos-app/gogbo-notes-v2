@@ -807,8 +807,120 @@ class StorageEngine {
       if (!this.rawGet(STORAGE_KEYS.COEFFICIENTS_CLASSES)) {
         this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
       }
+      // Synchronisation initiale avec Supabase si configuré
+      if (isSupabaseConfigured) {
+        void this.syncFromSupabase();
+      }
     } catch (e) {
       console.warn('StorageEngine init fallback notice:', e);
+    }
+  }
+
+  /**
+   * Synchronisation des données réelles depuis le serveur central Supabase
+   * Assure que Google AI Studio et Vercel lisent exactement la même source de vérité.
+   */
+  public async syncFromSupabase(): Promise<{ ok: boolean; count: number; error?: string }> {
+    if (!isSupabaseConfigured) {
+      return { ok: false, count: 0, error: 'Supabase non configuré' };
+    }
+    const client = getSupabaseClient();
+    if (!client) {
+      return { ok: false, count: 0, error: 'Client Supabase indisponible' };
+    }
+
+    try {
+      let itemsCount = 0;
+
+      // 1. Profils scolaires réels
+      const { data: remoteProfiles, error: errProf } = await client.from('profiles').select('*');
+      if (!errProf && remoteProfiles && remoteProfiles.length > 0) {
+        this.setItem(STORAGE_KEYS.PROFILES, remoteProfiles);
+        itemsCount += remoteProfiles.length;
+      }
+
+      // 2. Classes de l'établissement
+      const { data: remoteClasses, error: errCls } = await client.from('classes').select('*');
+      if (!errCls && remoteClasses && remoteClasses.length > 0) {
+        this.setItem(STORAGE_KEYS.CLASSES, remoteClasses);
+        itemsCount += remoteClasses.length;
+      }
+
+      // 3. Matières
+      const { data: remoteMatieres, error: errMat } = await client.from('matieres').select('*');
+      if (!errMat && remoteMatieres && remoteMatieres.length > 0) {
+        this.setItem(STORAGE_KEYS.MATIERES, remoteMatieres);
+        itemsCount += remoteMatieres.length;
+      }
+
+      // 4. Élèves
+      const { data: remoteEleves, error: errElv } = await client.from('eleves').select('*');
+      if (!errElv && remoteEleves && remoteEleves.length > 0) {
+        this.setItem(STORAGE_KEYS.ELEVES, remoteEleves);
+        itemsCount += remoteEleves.length;
+      }
+
+      // 5. Inscriptions annuelles
+      const { data: remoteInscs, error: errInsc } = await client.from('inscriptions_eleves').select('*');
+      if (!errInsc && remoteInscs && remoteInscs.length > 0) {
+        this.setItem(STORAGE_KEYS.INSCRIPTIONS, remoteInscs);
+        itemsCount += remoteInscs.length;
+      }
+
+      // 6. Affectations pédagogiques
+      const { data: remoteAffs, error: errAff } = await client.from('affectations').select('*');
+      if (!errAff && remoteAffs && remoteAffs.length > 0) {
+        this.setItem(STORAGE_KEYS.AFFECTATIONS, remoteAffs);
+        itemsCount += remoteAffs.length;
+      }
+
+      // 7. Notes
+      const { data: remoteNotes, error: errNotes } = await client.from('notes').select('*');
+      if (!errNotes && remoteNotes && remoteNotes.length > 0) {
+        this.setItem(STORAGE_KEYS.NOTES, remoteNotes);
+        itemsCount += remoteNotes.length;
+      }
+
+      // 8. Périodes scolaires
+      const { data: remotePeriodes, error: errPer } = await client.from('periodes').select('*');
+      if (!errPer && remotePeriodes && remotePeriodes.length > 0) {
+        this.setItem(STORAGE_KEYS.PERIODES, remotePeriodes);
+        itemsCount += remotePeriodes.length;
+      }
+
+      // 9. Années scolaires
+      const { data: remoteAnnees, error: errAnn } = await client.from('annees_scolaires').select('*');
+      if (!errAnn && remoteAnnees && remoteAnnees.length > 0) {
+        this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, remoteAnnees);
+        itemsCount += remoteAnnees.length;
+      }
+
+      // 10. Paramètres école
+      const { data: remoteParams, error: errParams } = await client.from('parametres_ecole').select('*').maybeSingle();
+      if (!errParams && remoteParams) {
+        this.setItem(STORAGE_KEYS.PARAMETRES, remoteParams);
+        itemsCount += 1;
+      }
+
+      // 11. Présences enseignants
+      const { data: remotePresEns, error: errPresEns } = await client.from('presences_enseignants').select('*');
+      if (!errPresEns && remotePresEns && remotePresEns.length > 0) {
+        this.setItem(STORAGE_KEYS.PRESENCES_ENSEIGNANTS, remotePresEns);
+        itemsCount += remotePresEns.length;
+      }
+
+      // 12. Professeurs principaux
+      const { data: remotePP, error: errPP } = await client.from('professeurs_principaux').select('*');
+      if (!errPP && remotePP && remotePP.length > 0) {
+        this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, remotePP);
+        itemsCount += remotePP.length;
+      }
+
+      return { ok: true, count: itemsCount };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn('Erreur lors de syncFromSupabase:', errMsg);
+      return { ok: false, count: 0, error: errMsg };
     }
   }
 
@@ -2950,7 +3062,73 @@ class StorageEngine {
       details: `${existingIndex !== -1 ? 'Modification' : 'Saisie'} note (${data.type_evaluation}) pour ${eleve?.nom} ${eleve?.prenom} (${per.annee_scolaire}): ${noteVal}/20`,
     });
 
+    // Synchronisation persistante avec Supabase si connecté
+    if (isSupabaseConfigured) {
+      const client = getSupabaseClient();
+      if (client) {
+        void (async () => {
+          try {
+            const { error } = await client.from('notes').upsert({
+              id: savedNote.id,
+              eleve_id: savedNote.eleve_id,
+              affectation_id: savedNote.affectation_id,
+              periode_id: savedNote.periode_id,
+              annee_scolaire: savedNote.annee_scolaire || per.annee_scolaire,
+              valeur: savedNote.valeur,
+              type_evaluation: savedNote.type_evaluation,
+              saisi_par: savedNote.saisi_par,
+              observation: savedNote.observation || null,
+              updated_at: now,
+            });
+            if (error) {
+              console.error('Erreur synchronisation Supabase (notes upsert):', error.message);
+            }
+          } catch (err) {
+            console.error('Exception Supabase notes upsert:', err);
+          }
+        })();
+      }
+    }
+
     return savedNote;
+  }
+
+  /**
+   * Version asynchrone vérifiée pour la saisie de note avec confirmation Supabase
+   */
+  public async saveNoteAsync(
+    data: {
+      eleve_id: string;
+      affectation_id: string;
+      periode_id: string;
+      valeur: number;
+      type_evaluation: Note['type_evaluation'];
+      observation?: string;
+    },
+    user: UserProfile
+  ): Promise<Note> {
+    const note = this.saveNote(data, user);
+    if (isSupabaseConfigured) {
+      const client = getSupabaseClient();
+      if (client) {
+        const { error } = await client.from('notes').upsert({
+          id: note.id,
+          eleve_id: note.eleve_id,
+          affectation_id: note.affectation_id,
+          periode_id: note.periode_id,
+          annee_scolaire: note.annee_scolaire,
+          valeur: note.valeur,
+          type_evaluation: note.type_evaluation,
+          saisi_par: note.saisi_par,
+          observation: note.observation || null,
+          updated_at: new Date().toISOString(),
+        });
+        if (error) {
+          throw new Error(`Échec d'enregistrement sur la base distante Supabase : ${error.message}`);
+        }
+      }
+    }
+    return note;
   }
 
   // --- AUDIT LOGS ---

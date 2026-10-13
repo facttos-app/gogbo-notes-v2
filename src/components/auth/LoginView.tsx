@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../lib/storage';
+import { isSupabaseConfigured, getSupabaseClient } from '../../lib/supabase';
+import { UserProfile } from '../../types';
 import { PasswordField } from '../ui/PasswordField';
 import { 
   GraduationCap, 
@@ -24,9 +26,10 @@ export type PortalType = 'ADMIN' | 'ENSEIGNANT' | 'PARENT';
 
 interface LoginViewProps {
   onBackToHome?: () => void;
+  onOpenSauvegardeModal?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauvegardeModal }) => {
   const { login, resetPassword } = useAuth();
   const [activePortal, setActivePortal] = useState<PortalType>('ADMIN');
   const [email, setEmail] = useState('');
@@ -77,9 +80,32 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
     }
 
     const profiles = storage.getProfiles();
-    const user = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+    let user = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+
+    if (!user && isSupabaseConfigured) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data: remoteProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+          if (remoteProfile) {
+            user = remoteProfile as UserProfile;
+          }
+        } catch (err) {
+          console.warn('Erreur vérification compte Supabase:', err);
+        }
+      }
+    }
+
     if (!user) {
-      setResetError("Aucun compte actif trouvé avec cette adresse e-mail.");
+      setResetError(
+        isSupabaseConfigured 
+          ? "Aucun compte actif trouvé avec cette adresse e-mail sur la base centrale Supabase."
+          : "Aucun compte actif trouvé avec cette adresse e-mail. Remarque : Supabase n'est pas encore connecté à cet environnement (stockage local actif)."
+      );
       return;
     }
 
@@ -399,6 +425,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome }) => {
               <span>{loading ? 'Vérification en cours...' : activePortal === 'PARENT' ? 'ACCÉDER À L\'ESPACE PARENTS' : 'SE CONNECTER'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            {onOpenSauvegardeModal && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-center">
+                <button
+                  id="btn-sauvegarde-locale-login"
+                  type="button"
+                  onClick={onOpenSauvegardeModal}
+                  className="text-xs text-slate-600 hover:text-emerald-700 font-medium inline-flex items-center space-x-1.5 py-1 px-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  title="Sauvegarder immédiatement les données réelles enregistrées dans ce navigateur"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Sauvegarde Intégrale des données de ce navigateur (JSON)</span>
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </main>

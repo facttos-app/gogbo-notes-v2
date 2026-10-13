@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../lib/storage';
-import { Settings, Save, CheckCircle2, AlertCircle, Building2, MapPin, Calendar, Award } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle, Building2, MapPin, Calendar, Award, ShieldCheck, Download, Copy, Check } from 'lucide-react';
+import { telechargerSauvegardeIntegrale, collecterSauvegardeIntegrale } from '../../lib/sauvegarde';
 
 export const ParametresEtablissement: React.FC = () => {
   const { currentUser, isCenseur } = useAuth();
@@ -205,6 +206,9 @@ export const ParametresEtablissement: React.FC = () => {
 
       {/* Section Gestion Pluriannuelle & Ouverture de Nouvelle Année */}
       <NouvelleAnneeSection />
+
+      {/* Section Sauvegarde Intégrale des Données Réelles */}
+      <SauvegardeIntegraleSection />
     </div>
   );
 };
@@ -367,3 +371,89 @@ const NouvelleAnneeSection: React.FC = () => {
     </div>
   );
 };
+
+const SauvegardeIntegraleSection: React.FC = () => {
+  const [downloading, setDownloading] = useState(false);
+  const [result, setResult] = useState<{ filename: string; sha256: string; totalEnregistrements: number; sizeKo: number; anneeActive: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const res = await telechargerSauvegardeIntegrale();
+      setResult(res);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleCopy = (hash: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(hash);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-4">
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-3">
+        <ShieldCheck className="w-5 h-5 text-emerald-700" />
+        <div>
+          <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+            Sauvegarde Intégrale des Données Réelles & Sécurisation Locale
+          </h3>
+          <p className="text-xs text-slate-500">
+            Export JSON complet (brut et métier) des données de ce navigateur sans aucune altération de l'existant
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-900 space-y-1">
+        <div className="font-bold flex items-center space-x-1.5 text-emerald-950">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>Opération certifiée 100% passive et non-destructive</span>
+        </div>
+        <p className="text-[11px] text-emerald-800">
+          Le téléchargement extrait la totalité des tables (élèves, comptes, notes, affectations, punitions, présences) et calcule une empreinte cryptographique SHA-256. Aucune donnée n'est modifiée ou réinitialisée.
+        </p>
+      </div>
+
+      {result && (
+        <div className="bg-slate-900 text-white rounded-lg p-3 text-xs space-y-1.5 font-mono">
+          <div className="text-emerald-400 font-bold flex items-center space-x-1 font-sans">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Archive téléchargée avec succès ({result.sizeKo} Ko)</span>
+          </div>
+          <div className="text-[11px] text-slate-300">Fichier : {result.filename}</div>
+          <div className="text-[11px] text-slate-300">Enregistrements : {result.totalEnregistrements}</div>
+          <div className="flex items-center space-x-2 text-[10px] text-emerald-300 break-all pt-1 border-t border-slate-800">
+            <span>SHA-256 : {result.sha256}</span>
+            <button
+              type="button"
+              onClick={() => handleCopy(result.sha256)}
+              className="text-xs text-slate-400 hover:text-white shrink-0 cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-colors flex items-center space-x-2 cursor-pointer shadow-xs disabled:opacity-60"
+        >
+          <Download className="w-4 h-4" />
+          <span>{downloading ? 'Génération en cours...' : 'Télécharger la Sauvegarde Complète (JSON)'}</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+

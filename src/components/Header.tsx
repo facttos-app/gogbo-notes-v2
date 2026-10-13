@@ -13,16 +13,18 @@ import {
   FileText,
   Calendar,
   Archive,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenTestModal: () => void;
   onOpenSqlModal: () => void;
   onOpenMonCompte?: () => void;
+  onOpenSauvegardeModal?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal, onOpenMonCompte }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal, onOpenMonCompte, onOpenSauvegardeModal }) => {
   const { currentUser, logout, switchUser } = useAuth();
   const { annees, activeAnnee, selectedAnnee, setSelectedAnnee, isArchive } = useAnnee();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -148,11 +150,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
           <button
             id="btn-view-sql"
             onClick={onOpenSqlModal}
-            className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+            className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
             title="Schéma Supabase / PostgreSQL"
           >
             <FileText className="w-3.5 h-3.5 text-emerald-400" />
             <span>SQL Supabase</span>
+          </button>
+
+          <button
+            id="btn-sauvegarde-integrale"
+            onClick={onOpenSauvegardeModal}
+            className="flex items-center space-x-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+            title="Télécharger la sauvegarde intégrale de toutes les données réelles (JSON)"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Sauvegarde Intégrale</span>
           </button>
         </div>
 
@@ -247,10 +259,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
                 setMobileMenuOpen(false);
                 onOpenSqlModal();
               }}
-              className="flex items-center space-x-2 w-full text-left bg-slate-700 text-slate-200 p-2 rounded text-xs"
+              className="flex items-center space-x-2 w-full text-left bg-slate-700 text-slate-200 p-2 rounded text-xs cursor-pointer"
             >
               <FileText className="w-4 h-4 text-emerald-400" />
               <span>Voir le schéma SQL Supabase / PostgreSQL</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenSauvegardeModal?.();
+              }}
+              className="flex items-center space-x-2 w-full text-left bg-emerald-600/20 text-emerald-300 p-2 rounded border border-emerald-500/40 text-xs font-semibold cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Sauvegarde Intégrale des Données (JSON)</span>
             </button>
           </div>
         </div>

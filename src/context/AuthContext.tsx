@@ -83,21 +83,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanDigits = cleanInput.replace(/[^0-9]/g, '');
       const cleanPass = pass.trim();
 
-      // Tentative Supabase Auth si configuré
+      // 1. Authentification Supabase Auth si configuré
       if (isSupabaseConfigured && cleanInput.includes('@')) {
         const supabase = getSupabaseClient();
         if (supabase) {
-          try {
-            await supabase.auth.signInWithPassword({
-              email: cleanInput,
-              password: cleanPass,
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: cleanInput,
+            password: cleanPass,
+          });
+
+          if (authError) {
+            setIsLoading(false);
+            const msg = authError.message.toLowerCase();
+            if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+              return { 
+                success: false, 
+                error: "Identifiant ou mot de passe incorrect sur le serveur central Supabase." 
+              };
+            }
+            if (msg.includes('email not confirmed')) {
+              return { 
+                success: false, 
+                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase." 
+              };
+            }
+            return { 
+              success: false, 
+              error: `Erreur d'authentification Supabase : ${authError.message}` 
+            };
+          }
+
+          if (authData?.user) {
+            // Récupérer le profil scolaire lié depuis public.profiles
+            const { data: profileRow, error: pErr } = await supabase
+              .from('profiles')
+              .select('*')
+              .or(`id.eq.${authData.user.id},email.eq.${cleanInput}`)
+              .maybeSingle();
+
+            if (pErr) {
+              console.warn('Erreur lecture profil Supabase:', pErr);
+            }
+
+            let profile: UserProfile | null = profileRow as UserProfile | null;
+            if (!profile) {
+              // Vérifier dans le stockage local pour rattrapage
+              profile = storage.getProfiles().find((p) => p.email.toLowerCase() === cleanInput) || null;
+            }
+
+            if (!profile) {
+              setIsLoading(false);
+              return {
+                success: false,
+                error: "Compte authentifié sur Supabase mais aucun profil scolaire actif rattaché dans la table 'profiles'.",
+              };
+            }
+
+            if (profile.statut !== 'ACTIF') {
+              setIsLoading(false);
+              return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
+            }
+
+            // Contrôle de séparation des portails
+            if (portalTarget === 'ADMIN') {
+              const adminRoles = ['DIRECTEUR_GENERAL', 'CENSEUR', 'CONCEPTEUR', 'SURVEILLANT_GENERAL', 'COMPTABLE'];
+              if (!adminRoles.includes(profile.role)) {
+                setIsLoading(false);
+                return {
+                  success: false,
+                  error: "Accès refusé au Portail Administration : Ce compte ne possède pas d'habilitation administrative.",
+                };
+              }
+            } else if (portalTarget === 'ENSEIGNANT') {
+              const userAffs = storage.getAffectationsByProfile(profile.id);
+              const canTeach = profile.is_enseignant || profile.role === 'ENSEIGNANT' || userAffs.length > 0;
+              if (!canTeach) {
+                setIsLoading(false);
+                return {
+                  success: false,
+                  error: "Accès refusé au Portail Enseignants : Ce compte n'exerce aucune fonction pédagogique active.",
+                };
+              }
+            } else if (portalTarget === 'PARENT') {
+              if (profile.role !== 'PARENT') {
+                setIsLoading(false);
+                return {
+                  success: false,
+                  error: "Accès refusé à l'Espace Parents : Ce compte est un compte du personnel scolaire.",
+                };
+              }
+            }
+
+            storage.setCurrentUserId(profile.id);
+            loadUserData(profile.id);
+
+            storage.addAuditLog({
+              user_id: profile.id,
+              user_nom: `${profile.nom} ${profile.prenom}`,
+              user_role: profile.role,
+              action: 'CONNEXION_SUPABASE',
+              table_cible: 'auth.users',
+              details: `Connexion certifiée Supabase Auth (${portalTarget || 'STANDARD'}) : ${profile.nom} ${profile.prenom} (${profile.role})`,
             });
-          } catch (e) {
-            console.warn('Supabase Auth signIn notice:', e);
+
+            setIsLoading(false);
+            return { success: true };
           }
         }
       }
 
+      // 2. Mode local de transition (quand Supabase n'est pas configuré dans l'environnement)
       const profiles = storage.getProfiles();
       let user = profiles.find((p) => p.email.toLowerCase() === cleanInput);
       if (!user && cleanDigits.length >= 8) {
@@ -110,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 1. Vérification de l'existence de l'identifiant et du mot de passe
+      // Contrôle de l'identifiant et du mot de passe en mode local
       if (!user) {
         setIsLoading(false);
         return { success: false, error: 'Identifiant (e-mail ou téléphone) ou mot de passe incorrect.' };
@@ -127,7 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
       }
 
-      // 2. Contrôle de séparation des portails (Exigences officielles)
+      // Contrôle de séparation des portails
       if (portalTarget === 'ADMIN') {
         const adminRoles = ['DIRECTEUR_GENERAL', 'CENSEUR', 'CONCEPTEUR', 'SURVEILLANT_GENERAL', 'COMPTABLE'];
         if (!adminRoles.includes(user.role)) {
@@ -157,7 +252,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Interdire l'accès des comptes parents aux portails du personnel
       if (user.role === 'PARENT' && portalTarget !== 'PARENT') {
         setIsLoading(false);
         return {
@@ -173,9 +267,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user_id: user.id,
         user_nom: `${user.nom} ${user.prenom}`,
         user_role: user.role,
-        action: 'CONNEXION',
+        action: 'CONNEXION_LOCAL',
         table_cible: 'auth',
-        details: `Connexion réussie via Portail ${portalTarget || 'STANDARD'} : ${user.nom} ${user.prenom} (${user.role})`,
+        details: `Connexion locale (${portalTarget || 'STANDARD'}) : ${user.nom} ${user.prenom} (${user.role})`,
       });
 
       setIsLoading(false);
@@ -187,6 +281,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (emailOrId: string, newPass: string): Promise<{ success: boolean; error?: string }> => {
+    const cleanEmail = emailOrId.trim().toLowerCase();
+    if (isSupabaseConfigured && cleanEmail.includes('@')) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+          if (error) {
+            return { success: false, error: `Erreur Supabase réinitialisation : ${error.message}` };
+          }
+          return { 
+            success: true, 
+            error: undefined 
+          };
+        } catch (e: unknown) {
+          return { success: false, error: e instanceof Error ? e.message : 'Erreur réseau Supabase' };
+        }
+      }
+    }
     return storage.resetUserPassword(emailOrId, newPass);
   };
 

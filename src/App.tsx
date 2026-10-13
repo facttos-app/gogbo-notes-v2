@@ -36,6 +36,7 @@ import { HomePage } from './components/home/HomePage';
 import { SuiteTestsModal } from './components/modals/SuiteTestsModal';
 import { SqlSchemaModal } from './components/modals/SqlSchemaModal';
 import { MonCompteModal } from './components/modals/MonCompteModal';
+import { SauvegardeIntegraleModal } from './components/modals/SauvegardeIntegraleModal';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ArrowLeft } from 'lucide-react';
 
@@ -82,6 +83,7 @@ const MainAppContent: React.FC = () => {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [isMonCompteOpen, setIsMonCompteOpen] = useState(false);
+  const [isSauvegardeModalOpen, setIsSauvegardeModalOpen] = useState(false);
   // Afficher par défaut la page de connexion officielle (Portails Admin & Enseignant & Parent)
   const [showLogin, setShowLogin] = useState(true);
 
@@ -130,9 +132,28 @@ const MainAppContent: React.FC = () => {
 
   if (!currentUser) {
     if (!showLogin) {
-      return <HomePage onAccederPlateforme={() => setShowLogin(true)} />;
+      return (
+        <>
+          <HomePage onAccederPlateforme={() => setShowLogin(true)} />
+          <SauvegardeIntegraleModal
+            isOpen={isSauvegardeModalOpen}
+            onClose={() => setIsSauvegardeModalOpen(false)}
+          />
+        </>
+      );
     }
-    return <LoginView onBackToHome={() => setShowLogin(false)} />;
+    return (
+      <>
+        <LoginView 
+          onBackToHome={() => setShowLogin(false)} 
+          onOpenSauvegardeModal={() => setIsSauvegardeModalOpen(true)}
+        />
+        <SauvegardeIntegraleModal
+          isOpen={isSauvegardeModalOpen}
+          onClose={() => setIsSauvegardeModalOpen(false)}
+        />
+      </>
+    );
   }
 
   const renderTabContent = () => {
@@ -225,6 +246,7 @@ const MainAppContent: React.FC = () => {
         onOpenTestModal={() => setIsTestModalOpen(true)}
         onOpenSqlModal={() => setIsSqlModalOpen(true)}
         onOpenMonCompte={() => setIsMonCompteOpen(true)}
+        onOpenSauvegardeModal={() => setIsSauvegardeModalOpen(true)}
       />
 
       {/* Barre de navigation dynamique selon le profil avec déconnexion à gauche */}
@@ -285,6 +307,12 @@ const MainAppContent: React.FC = () => {
       <SqlSchemaModal
         isOpen={isSqlModalOpen}
         onClose={() => setIsSqlModalOpen(false)}
+      />
+
+      {/* Modal de Sauvegarde Intégrale des Données Réelles (CEG GOGBO 2026–2027) */}
+      <SauvegardeIntegraleModal
+        isOpen={isSauvegardeModalOpen}
+        onClose={() => setIsSauvegardeModalOpen(false)}
       />
     </div>
   );
