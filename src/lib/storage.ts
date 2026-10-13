@@ -916,6 +916,76 @@ class StorageEngine {
         itemsCount += remotePP.length;
       }
 
+      // 13. Présences quotidiennes apprenants
+      try {
+        const { data: remotePres, error: errPres } = await client.from('presences').select('*');
+        if (!errPres && remotePres && remotePres.length > 0) {
+          this.setItem(STORAGE_KEYS.PRESENCES, remotePres);
+          itemsCount += remotePres.length;
+        }
+      } catch {}
+
+      // 14. Notes de conduite
+      try {
+        const { data: remoteCond, error: errCond } = await client.from('notes_conduite').select('*');
+        if (!errCond && remoteCond && remoteCond.length > 0) {
+          this.setItem(STORAGE_KEYS.NOTES_CONDUITE, remoteCond);
+          itemsCount += remoteCond.length;
+        }
+      } catch {}
+
+      // 15. Punitions et sanctions disciplinaires
+      try {
+        const { data: remotePun, error: errPun } = await client.from('punitions_scolaires').select('*');
+        if (!errPun && remotePun && remotePun.length > 0) {
+          this.setItem(STORAGE_KEYS.PUNITIONS, remotePun);
+          itemsCount += remotePun.length;
+        }
+        const { data: remoteSanc, error: errSanc } = await client.from('sanctions_disciplinaires').select('*');
+        if (!errSanc && remoteSanc && remoteSanc.length > 0) {
+          this.setItem(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, remoteSanc);
+          itemsCount += remoteSanc.length;
+        }
+        const { data: remoteInc, error: errInc } = await client.from('incidents_disciplinaires').select('*');
+        if (!errInc && remoteInc && remoteInc.length > 0) {
+          this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, remoteInc);
+          itemsCount += remoteInc.length;
+        }
+      } catch {}
+
+      // 16. Finances & Contributions scolaires
+      try {
+        const { data: remoteContr, error: errContr } = await client.from('contributions').select('*');
+        if (!errContr && remoteContr && remoteContr.length > 0) {
+          this.setItem(STORAGE_KEYS.CONTRIBUTIONS, remoteContr);
+          itemsCount += remoteContr.length;
+        }
+        const { data: remotePaie, error: errPaie } = await client.from('paiements_contributions').select('*');
+        if (!errPaie && remotePaie && remotePaie.length > 0) {
+          this.setItem(STORAGE_KEYS.PAIEMENTS, remotePaie);
+          itemsCount += remotePaie.length;
+        }
+        const { data: remoteDep, error: errDep } = await client.from('depenses_budgetaires').select('*');
+        if (!errDep && remoteDep && remoteDep.length > 0) {
+          this.setItem(STORAGE_KEYS.DEPENSES, remoteDep);
+          itemsCount += remoteDep.length;
+        }
+      } catch {}
+
+      // 17. Parents d'élèves
+      try {
+        const { data: remoteParents, error: errParents } = await client.from('parents').select('*');
+        if (!errParents && remoteParents && remoteParents.length > 0) {
+          this.setItem(STORAGE_KEYS.PARENTS, remoteParents);
+          itemsCount += remoteParents.length;
+        }
+        const { data: remotePE, error: errPE } = await client.from('parent_eleves').select('*');
+        if (!errPE && remotePE && remotePE.length > 0) {
+          this.setItem(STORAGE_KEYS.PARENT_ELEVES, remotePE);
+          itemsCount += remotePE.length;
+        }
+      } catch {}
+
       return { ok: true, count: itemsCount };
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -984,8 +1054,14 @@ class StorageEngine {
     });
   }
 
+  public saveProfiles(profiles: UserProfile[]): void {
+    this.setItem(STORAGE_KEYS.PROFILES, profiles);
+  }
+
   public getProfileById(id: string): UserProfile | undefined {
-    return this.getProfiles().find((p) => p.id === id);
+    if (!id) return undefined;
+    const clean = id.trim().toLowerCase();
+    return this.getProfiles().find((p) => p.id === id || (p.email && p.email.toLowerCase() === clean));
   }
 
   public setUserPassword(userId: string, newPass: string): void {

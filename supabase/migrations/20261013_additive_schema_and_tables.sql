@@ -379,3 +379,22 @@ CREATE POLICY "Lecture parent_eleves" ON public.parent_eleves FOR SELECT TO auth
 CREATE POLICY "Gestion parent_eleves" ON public.parent_eleves FOR ALL TO authenticated USING (true);
 CREATE POLICY "Lecture parent_notifications" ON public.parent_notifications FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Gestion parent_notifications" ON public.parent_notifications FOR ALL TO authenticated USING (true);
+
+-- 6. POLITIQUES RLS SUR PROFILES (AUTO-CRÉATION & RATTACHEMENT SÉCURISÉ)
+DO $$ BEGIN
+  CREATE POLICY "Utilisateur peut inserer son propre profil"
+    ON public.profiles FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = id);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Utilisateur peut mettre a jour son propre profil"
+    ON public.profiles FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = id);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;

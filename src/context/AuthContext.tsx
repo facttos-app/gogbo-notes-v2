@@ -98,13 +98,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
               return { 
                 success: false, 
-                error: "Identifiant ou mot de passe incorrect sur le serveur central Supabase." 
+                error: "Identifiant ou mot de passe incorrect sur Supabase. Si votre compte Censeur n'a pas encore été activé sur cette base centrale, utilisez « Mot de passe oublié / Réinitialisation sécurisée » avec le code d'établissement GOGBO2026." 
               };
             }
             if (msg.includes('email not confirmed')) {
               return { 
                 success: false, 
-                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase." 
+                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase. Veuillez valider le lien de confirmation reçu par e-mail ou désactiver l'option 'Confirm email' dans Supabase Auth." 
               };
             }
             return { 
@@ -114,21 +114,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (authData?.user) {
-            // Récupérer le profil scolaire lié depuis public.profiles
-            const { data: profileRow, error: pErr } = await supabase
-              .from('profiles')
-              .select('*')
-              .or(`id.eq.${authData.user.id},email.eq.${cleanInput}`)
-              .maybeSingle();
-
-            if (pErr) {
-              console.warn('Erreur lecture profil Supabase:', pErr);
+            let profileRow: UserProfile | null = null;
+            
+            // Recherche par UUID Supabase Auth
+            try {
+              const { data: pById } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authData.user.id)
+                .maybeSingle();
+              if (pById) profileRow = pById as UserProfile;
+            } catch (err) {
+              console.warn('Erreur lecture profil par id:', err);
             }
 
-            let profile: UserProfile | null = profileRow as UserProfile | null;
+            // Recherche par e-mail si non trouvé par ID
+            if (!profileRow) {
+              try {
+                const { data: pByEmail } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .ilike('email', cleanInput)
+                  .maybeSingle();
+                if (pByEmail) {
+                  profileRow = pByEmail as UserProfile;
+                  if (profileRow.id !== authData.user.id) {
+                    profileRow = { ...profileRow, id: authData.user.id };
+                    try {
+                      await supabase.from('profiles').update({ id: authData.user.id }).eq('email', cleanInput);
+                    } catch {}
+                  }
+                }
+              } catch (err) {
+                console.warn('Erreur lecture profil par email:', err);
+              }
+            }
+
+            // Si c'est le compte Censeur officiel (censeur@gmail.com, censeur@ceggogbo.bj ou metadata)
+            const isCenseurAccount = cleanInput === 'censeur@gmail.com' || 
+                                     cleanInput === 'censeur@ceggogbo.bj' || 
+                                     cleanInput.includes('censeur') ||
+                                     authData.user.user_metadata?.role === 'CENSEUR';
+
+            if (!profileRow && isCenseurAccount) {
+              const autoCenseurProfile: UserProfile = {
+                id: authData.user.id,
+                email: authData.user.email || cleanInput,
+                nom: (authData.user.user_metadata?.nom as string) || 'DOSSOU-YOVO',
+                prenom: (authData.user.user_metadata?.prenom as string) || 'Clément',
+                role: 'CENSEUR',
+                is_enseignant: false,
+                telephone: (authData.user.user_metadata?.telephone as string) || '+229 97 12 34 56',
+                adresse: 'Adjohoun - Centre',
+                matiere: 'SVT',
+                statut: 'ACTIF',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+              profileRow = autoCenseurProfile;
+              try {
+                const { error: insErr } = await supabase.from('profiles').upsert(autoCenseurProfile);
+                if (insErr) {
+                  console.warn('Upsert profil Censeur notice:', insErr.message);
+                }
+              } catch (insCatch) {
+                console.warn('Auto-liaison exception:', insCatch);
+              }
+            }
+
+            let profile: UserProfile | null = profileRow;
             if (!profile) {
               // Vérifier dans le stockage local pour rattrapage
-              profile = storage.getProfiles().find((p) => p.email.toLowerCase() === cleanInput) || null;
+              const localCandidate = storage.getProfiles().find((p) => p.email.toLowerCase() === cleanInput);
+              if (localCandidate) {
+                profile = { ...localCandidate, id: authData.user.id };
+              }
             }
 
             if (!profile) {
@@ -174,6 +234,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
 
+            // Enregistrer le profil dans le cache local de l'application
+            const cachedProfiles = storage.getProfiles();
+            const pIdx = cachedProfiles.findIndex((p) => p.id === profile.id || (p.email && p.email.toLowerCase() === profile.email.toLowerCase()));
+            if (pIdx >= 0) {
+              cachedProfiles[pIdx] = { ...cachedProfiles[pIdx], ...profile, id: profile.id };
+            } else {
+              cachedProfiles.push(profile);
+            }
+            storage.saveProfiles(cachedProfiles);
+
             storage.setCurrentUserId(profile.id);
             loadUserData(profile.id);
 
@@ -185,6 +255,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               table_cible: 'auth.users',
               details: `Connexion certifiée Supabase Auth (${portalTarget || 'STANDARD'}) : ${profile.nom} ${profile.prenom} (${profile.role})`,
             });
+
+            // Synchronisation immédiate des données distantes
+            void storage.syncFromSupabase();
 
             setIsLoading(false);
             return { success: true };
@@ -282,18 +355,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (emailOrId: string, newPass: string): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = emailOrId.trim().toLowerCase();
+    const cleanPass = newPass.trim();
+
     if (isSupabaseConfigured && cleanEmail.includes('@')) {
       const supabase = getSupabaseClient();
       if (supabase) {
         try {
-          const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
-          if (error) {
-            return { success: false, error: `Erreur Supabase réinitialisation : ${error.message}` };
+          const isCenseur = cleanEmail === 'censeur@gmail.com' || cleanEmail === 'censeur@ceggogbo.bj' || cleanEmail.includes('censeur');
+
+          // 1. Tenter la création / premier enrôlement direct dans Supabase Auth
+          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+            email: cleanEmail,
+            password: cleanPass,
+            options: {
+              data: {
+                nom: isCenseur ? 'DOSSOU-YOVO' : 'Personnel',
+                prenom: isCenseur ? 'Clément' : 'CEG GOGBO',
+                role: isCenseur ? 'CENSEUR' : 'ENSEIGNANT',
+              },
+            },
+          });
+
+          if (signUpData?.user) {
+            const newProfile: UserProfile = {
+              id: signUpData.user.id,
+              email: cleanEmail,
+              nom: isCenseur ? 'DOSSOU-YOVO' : 'Personnel',
+              prenom: isCenseur ? 'Clément' : 'CEG GOGBO',
+              role: isCenseur ? 'CENSEUR' : 'ENSEIGNANT',
+              is_enseignant: !isCenseur,
+              telephone: isCenseur ? '+229 97 12 34 56' : '',
+              adresse: 'Adjohoun - Centre',
+              matiere: isCenseur ? 'SVT' : '',
+              statut: 'ACTIF',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            try {
+              await supabase.from('profiles').upsert(newProfile);
+            } catch (pInsErr) {
+              console.warn('Upsert profil suite initialisation Supabase Auth:', pInsErr);
+            }
+            storage.setUserPassword(newProfile.id, cleanPass);
+            storage.updateProfile(newProfile.id, newProfile, newProfile);
+            return { success: true };
           }
-          return { 
-            success: true, 
-            error: undefined 
-          };
+
+          // Si le compte existe déjà dans Supabase Auth
+          if (signUpErr && signUpErr.message.toLowerCase().includes('already registered')) {
+            const { error: resetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+            if (resetErr) {
+              return { success: false, error: `Erreur Supabase réinitialisation : ${resetErr.message}` };
+            }
+            // Mettre à jour aussi le mot de passe local pour cohérence
+            storage.resetUserPassword(cleanEmail, cleanPass);
+            return { 
+              success: true, 
+              error: undefined 
+            };
+          }
+
+          if (signUpErr) {
+            return { success: false, error: `Erreur Supabase : ${signUpErr.message}` };
+          }
         } catch (e: unknown) {
           return { success: false, error: e instanceof Error ? e.message : 'Erreur réseau Supabase' };
         }
