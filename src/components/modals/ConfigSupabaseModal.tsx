@@ -131,7 +131,7 @@ export const ConfigSupabaseModal: React.FC<ConfigSupabaseModalProps> = ({ isOpen
           {/* Formulaire de configuration */}
           <div className="space-y-3 pt-1">
             <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 URL du projet Supabase (VITE_SUPABASE_URL)
               </label>
               <input
@@ -139,12 +139,12 @@ export const ConfigSupabaseModal: React.FC<ConfigSupabaseModalProps> = ({ isOpen
                 placeholder="https://votre-projet.supabase.co"
                 value={config.url}
                 onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 placeholder:text-slate-500 bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 Clé Publique Anon (VITE_SUPABASE_ANON_KEY)
               </label>
               <textarea
@@ -152,7 +152,7 @@ export const ConfigSupabaseModal: React.FC<ConfigSupabaseModalProps> = ({ isOpen
                 placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 value={config.anonKey}
                 onChange={(e) => setConfig({ ...config, anonKey: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 placeholder:text-slate-500 bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium shadow-2xs"
               />
             </div>
           </div>

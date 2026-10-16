@@ -301,11 +301,11 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* 1. NOM */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">
-                    Nom de famille <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Nom de famille <span className="text-red-600 font-black">*</span>
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
                       id="input-moncompte-nom"
                       type="text"
@@ -313,18 +313,18 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
                       value={nom}
                       onChange={(e) => setNom(e.target.value)}
                       placeholder="Votre nom de famille"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
+                      className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white shadow-2xs"
                     />
                   </div>
                 </div>
 
                 {/* 2. PRÉNOMS */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">
-                    Prénoms <span className="text-red-500">*</span>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Prénoms <span className="text-red-600 font-black">*</span>
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
                       id="input-moncompte-prenom"
                       type="text"
@@ -332,7 +332,7 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
                       value={prenom}
                       onChange={(e) => setPrenom(e.target.value)}
                       placeholder="Vos prénoms"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
+                      className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white shadow-2xs"
                     />
                   </div>
                 </div>
@@ -340,11 +340,11 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
 
               {/* 3. EMAIL (Identifiant) */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Email (Identifiant de connexion) <span className="text-red-500">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  Email (Identifiant de connexion) <span className="text-red-600 font-black">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     id="input-moncompte-email"
                     type="email"
@@ -352,10 +352,10 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="adresse.email@ceggogbo.bj"
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-mono focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-medium"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-mono text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-medium shadow-2xs"
                   />
                 </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
+                <span className="text-[11px] text-slate-600 mt-1 block font-medium">
                   Cet email est l'identifiant unique utilisé pour vous authentifier sur le portail GOGBO NOTES.
                 </span>
               </div>
@@ -363,36 +363,36 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* 4. CONTACT TÉLÉPHONE */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
                     Contact téléphone
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
                       id="input-moncompte-telephone"
                       type="tel"
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
                       placeholder="+229 97 00 00 00"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
+                      className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-medium shadow-2xs"
                     />
                   </div>
                 </div>
 
                 {/* 5. RÉSIDENCE / ADRESSE */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
                     Résidence / Adresse
                   </label>
                   <div className="relative">
-                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                     <input
                       id="input-moncompte-adresse"
                       type="text"
                       value={adresse}
                       onChange={(e) => setAdresse(e.target.value)}
                       placeholder="ex. Adjohoun - Quartier Démè"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
+                      className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-medium shadow-2xs"
                     />
                   </div>
                 </div>
@@ -400,18 +400,18 @@ export const MonCompteModal: React.FC<MonCompteModalProps> = ({ isOpen, onClose 
 
               {/* 6. MATIÈRE / DISCIPLINE */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
                   Matière / Discipline d'enseignement
                 </label>
                 <div className="relative">
-                  <BookOpen className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <BookOpen className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     id="input-moncompte-matiere"
                     type="text"
                     value={matiere}
                     onChange={(e) => setMatiere(e.target.value)}
                     placeholder="ex. SVT, Mathématiques, Français (Lecture & Communication écrite)..."
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-semibold"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white font-semibold shadow-2xs"
                   />
                 </div>
 

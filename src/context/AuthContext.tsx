@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, AffectationPedagogique } from '../types';
 import { storage } from '../lib/storage';
-import { isSupabaseConfigured, getSupabaseClient } from '../lib/supabase';
+import { isSupabaseConfigured, getSupabaseClient, checkIsSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
@@ -82,15 +82,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanInput = emailOrPhone.trim().toLowerCase();
       const cleanDigits = cleanInput.replace(/[^0-9]/g, '');
       const cleanPass = pass.trim();
+      const isSupa = checkIsSupabaseConfigured();
 
       // 1. Authentification Supabase Auth si configuré
-      if (isSupabaseConfigured && cleanInput.includes('@')) {
+      if (isSupa && cleanInput.includes('@')) {
         const supabase = getSupabaseClient();
         if (supabase) {
-          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email: cleanInput,
-            password: cleanPass,
-          });
+          let authData = null;
+          let authError = null;
+
+          try {
+            const res = await supabase.auth.signInWithPassword({
+              email: cleanInput,
+              password: cleanPass,
+            });
+            authData = res.data;
+            authError = res.error;
+          } catch (netErr: unknown) {
+            setIsLoading(false);
+            const netMsg = netErr instanceof Error ? netErr.message : String(netErr);
+            return {
+              success: false,
+              error: `Serveur Supabase momentanément inaccessible (${netMsg}). Vérifiez votre connexion Internet ou réessayez dans quelques instants. Le portail d'authentification reste disponible.`
+            };
+          }
 
           if (authError) {
             setIsLoading(false);
@@ -105,6 +120,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return { 
                 success: false, 
                 error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase. Veuillez valider le lien de confirmation reçu par e-mail ou désactiver l'option 'Confirm email' dans Supabase Auth." 
+              };
+            }
+            if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed')) {
+              return {
+                success: false,
+                error: `Serveur Supabase momentanément injoignable (${authError.message}). L'infrastructure reste opérationnelle ; réessayez dans un instant.`
               };
             }
             return { 
@@ -185,7 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             let profile: UserProfile | null = profileRow;
             if (!profile) {
               // Vérifier dans le stockage local pour rattrapage
-              const localCandidate = storage.getProfiles().find((p) => p.email.toLowerCase() === cleanInput);
+              const localCandidate = storage.getProfiles().find((p) => p.email && p.email.toLowerCase() === cleanInput);
               if (localCandidate) {
                 profile = { ...localCandidate, id: authData.user.id };
               }
@@ -266,8 +287,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // 2. Mode local de transition (quand Supabase n'est pas configuré dans l'environnement)
+      if (!isSupa && cleanInput.includes('@')) {
+        setIsLoading(false);
+        return {
+          success: false,
+          error: "Base centrale Supabase non connectée : Les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY ne sont pas configurées dans cet environnement Vercel. Cliquez sur le bandeau « Mode Local Persistant (Supabase en attente) » pour renseigner l'URL et la clé Anon de votre projet Supabase."
+        };
+      }
+
       const profiles = storage.getProfiles();
-      let user = profiles.find((p) => p.email.toLowerCase() === cleanInput);
+      let user = profiles.find((p) => p.email && p.email.toLowerCase() === cleanInput);
+      if (!user && (cleanInput === 'censeur@gmail.com' || cleanInput === 'censeur@ceggogbo.bj')) {
+        user = storage.getProfileById('usr-censeur');
+      }
       if (!user && cleanDigits.length >= 8) {
         user = profiles.find((p) => p.telephone && p.telephone.replace(/[^0-9]/g, '').endsWith(cleanDigits));
       }
@@ -357,7 +389,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = emailOrId.trim().toLowerCase();
     const cleanPass = newPass.trim();
 
-    if (isSupabaseConfigured && cleanEmail.includes('@')) {
+    if (checkIsSupabaseConfigured() && cleanEmail.includes('@')) {
       const supabase = getSupabaseClient();
       if (supabase) {
         try {

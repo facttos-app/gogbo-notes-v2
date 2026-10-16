@@ -33,7 +33,7 @@ import {
   StatutSanction
 } from '../types';
 import { OFFICIAL_IDENTITY, OFFICIAL_CLASSES, OFFICIAL_MATIERES, OFFICIAL_PERIODES, OFFICIAL_ANNEES_SCOLAIRES } from './constants';
-import { getSupabaseClient, isSupabaseConfigured } from './supabase';
+import { getSupabaseClient, isSupabaseConfigured, checkIsSupabaseConfigured } from './supabase';
 
 // ====================================================================
 // SÉCURITÉ CRYPTOGRAPHIQUE DES MOTS DE PASSE (CONFORME FIPS 180-4 SHA-256)
@@ -518,7 +518,7 @@ class StorageEngine {
           const storedProfiles = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, []);
           const cleanedProfiles = storedProfiles.filter((p) => !FICTIVE_PROFILE_IDS.has(p.id));
           for (const off of SEED_PROFILES) {
-            if (!cleanedProfiles.some((p) => p.id === off.id || p.email.toLowerCase() === off.email.toLowerCase())) {
+            if (!cleanedProfiles.some((p) => p.id === off.id || (p.email && off.email && p.email.toLowerCase() === off.email.toLowerCase()))) {
               cleanedProfiles.push(off);
             }
           }
@@ -808,7 +808,7 @@ class StorageEngine {
         this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
       }
       // Synchronisation initiale avec Supabase si configuré
-      if (isSupabaseConfigured) {
+      if (checkIsSupabaseConfigured()) {
         void this.syncFromSupabase();
       }
     } catch (e) {
@@ -821,7 +821,7 @@ class StorageEngine {
    * Assure que Google AI Studio et Vercel lisent exactement la même source de vérité.
    */
   public async syncFromSupabase(): Promise<{ ok: boolean; count: number; error?: string }> {
-    if (!isSupabaseConfigured) {
+    if (!checkIsSupabaseConfigured()) {
       return { ok: false, count: 0, error: 'Supabase non configuré' };
     }
     const client = getSupabaseClient();

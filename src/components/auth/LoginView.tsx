@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../lib/storage';
-import { isSupabaseConfigured, getSupabaseClient, getSupabaseConfigStatus } from '../../lib/supabase';
+import { isSupabaseConfigured, getSupabaseClient, getSupabaseConfigStatus, checkIsSupabaseConfigured } from '../../lib/supabase';
 import { UserProfile } from '../../types';
 import { PasswordField } from '../ui/PasswordField';
 import { ConfigSupabaseModal } from '../modals/ConfigSupabaseModal';
@@ -90,9 +90,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
     }
 
     const profiles = storage.getProfiles();
-    let user = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+    let user = profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail);
 
-    if (!user && isSupabaseConfigured) {
+    const isSupaActive = checkIsSupabaseConfigured();
+    if (!user && isSupaActive) {
       const supabase = getSupabaseClient();
       if (supabase) {
         try {
@@ -131,7 +132,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
 
     if (!user) {
       setResetError(
-        isSupabaseConfigured 
+        isSupaActive 
           ? "Aucun compte actif trouvé avec cette adresse e-mail sur la base centrale Supabase."
           : "Aucun compte actif trouvé avec cette adresse e-mail. Remarque : Supabase n'est pas encore connecté à cet environnement (stockage local actif)."
       );
@@ -226,7 +227,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
             type="button"
             onClick={() => setIsConfigSupabaseOpen(true)}
             className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer shadow-xs ${
-              isSupabaseConfigured
+              checkIsSupabaseConfigured()
                 ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900'
                 : 'bg-slate-900/90 text-amber-300 border-amber-600/50 hover:bg-slate-800'
             }`}
@@ -234,11 +235,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
           >
             <Database className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
             <span>
-              {isSupabaseConfigured
+              {checkIsSupabaseConfigured()
                 ? 'Base Centrale Supabase Connectée'
                 : 'Mode Local Persistant (Supabase en attente)'}
             </span>
-            <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+            <span className={`w-2 h-2 rounded-full ${checkIsSupabaseConfigured() ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
           </button>
         </div>
       </header>
@@ -394,16 +395,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
           {/* Formulaire de connexion avec PasswordField sécurisé (Exigence 1) */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="login-email-input" className="block text-slate-700 font-semibold mb-1 text-xs sm:text-sm">
+              <label htmlFor="login-email-input" className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">
                 {activePortal === 'ADMIN'
                   ? 'Identifiant ou Email académique'
                   : activePortal === 'ENSEIGNANT'
                     ? 'Email académique ou Téléphone'
                     : 'Numéro de téléphone ou Email du parent'}{' '}
-                <span className="text-red-500">*</span>
+                <span className="text-red-600 font-black">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -420,7 +421,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
                   }
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white"
+                  className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 font-medium focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white shadow-2xs"
                 />
               </div>
             </div>
@@ -532,30 +533,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
               )}
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1 text-xs">
-                  Identifiant ou E-mail académique <span className="text-red-500">*</span>
+                <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">
+                  Identifiant ou E-mail académique <span className="text-red-600 font-black">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
                     type="email"
                     required
-                    placeholder="censeur@ceggogbo.bj"
+                    placeholder="censeur@ceggogbo.bj ou censeur@gmail.com"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-600 bg-white"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 font-medium focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white shadow-2xs"
                   />
                 </div>
+                <p className="text-[11px] text-slate-600 mt-1 font-normal">
+                  Saisissez l'adresse email associée à votre compte pour réinitialiser vos accès.
+                </p>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1 text-xs">
-                  Code de sécurité institutionnel <span className="text-red-500">*</span>
+                <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">
+                  Code de sécurité institutionnel <span className="text-red-600 font-black">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <input
@@ -564,11 +568,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
                     placeholder="GOGBO2026"
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-mono tracking-wider uppercase focus:ring-2 focus:ring-emerald-600 bg-white"
+                    className="w-full pl-9 pr-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm font-mono tracking-wider uppercase text-slate-900 placeholder:text-slate-500 font-bold focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 bg-white shadow-2xs"
                   />
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Code officiel d'établissement pour la session 2026–2027 : <strong>GOGBO2026</strong>
+                <p className="text-[11px] text-slate-600 mt-1 font-medium">
+                  Code officiel d'établissement pour la session 2026–2027 : <strong className="text-emerald-900">GOGBO2026</strong>
                 </p>
               </div>
 
@@ -595,14 +599,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onBackToHome, onOpenSauveg
                 <button
                   type="button"
                   onClick={() => setIsResetModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={resetLoading}
-                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center space-x-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center space-x-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${resetLoading ? 'animate-spin' : ''}`} />
                   <span>{resetLoading ? 'Réinitialisation...' : 'Enregistrer le nouveau mot de passe'}</span>

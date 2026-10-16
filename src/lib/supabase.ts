@@ -1,54 +1,88 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Récupération directe des variables d'environnement Vite (remplacement statique garanti lors du build)
-const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string> }).env : undefined) || {};
-const staticUrl = metaEnv.VITE_SUPABASE_URL || metaEnv.NEXT_PUBLIC_SUPABASE_URL || '';
-const staticAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || metaEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+// Récupération directe et sécurisée des variables d'environnement Vite
+const readEnvVar = (value: unknown): string => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  return '';
+};
+
+// Accès explicite statique pour permettre le remplacement au build Vite sans dépendance à process.env
+const staticUrl = 
+  readEnvVar(import.meta.env?.VITE_SUPABASE_URL) || 
+  readEnvVar(import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || 
+  '';
+
+const staticAnonKey = 
+  readEnvVar(import.meta.env?.VITE_SUPABASE_ANON_KEY) || 
+  readEnvVar(import.meta.env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) || 
+  '';
 
 // Résolution de configuration (avec possibilité de configuration souveraine locale)
 export function getEffectiveConfig(): { url: string; anonKey: string } {
   let url = staticUrl;
   let anonKey = staticAnonKey;
 
-  if (typeof window !== 'undefined') {
-    const customUrl = localStorage.getItem('gogbo_v2_custom_supabase_url');
-    const customKey = localStorage.getItem('gogbo_v2_custom_supabase_anon_key');
-    if (customUrl && customKey && customUrl.startsWith('http')) {
-      url = customUrl;
-      anonKey = customKey;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const customUrl = localStorage.getItem('gogbo_v2_custom_supabase_url');
+      const customKey = localStorage.getItem('gogbo_v2_custom_supabase_anon_key');
+      if (customUrl && customKey && customUrl.startsWith('http')) {
+        url = customUrl;
+        anonKey = customKey;
+      }
     }
+  } catch (e) {
+    console.warn('Notice lecture localStorage config Supabase:', e);
   }
 
-  return { url: url.trim(), anonKey: anonKey.trim() };
+  return { url: (url || '').trim(), anonKey: (anonKey || '').trim() };
 }
 
 export function saveCustomSupabaseConfig(url: string, anonKey: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('gogbo_v2_custom_supabase_url', url.trim());
-    localStorage.setItem('gogbo_v2_custom_supabase_anon_key', anonKey.trim());
-    clientInstance = null;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('gogbo_v2_custom_supabase_url', url.trim());
+      localStorage.setItem('gogbo_v2_custom_supabase_anon_key', anonKey.trim());
+      clientInstance = null;
+      isSupabaseConfigured = checkIsSupabaseConfigured();
+    }
+  } catch (e) {
+    console.warn('Notice écriture localStorage config Supabase:', e);
   }
 }
 
 export function clearCustomSupabaseConfig(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('gogbo_v2_custom_supabase_url');
-    localStorage.removeItem('gogbo_v2_custom_supabase_anon_key');
-    clientInstance = null;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('gogbo_v2_custom_supabase_url');
+      localStorage.removeItem('gogbo_v2_custom_supabase_anon_key');
+      clientInstance = null;
+      isSupabaseConfigured = checkIsSupabaseConfigured();
+    }
+  } catch (e) {
+    console.warn('Notice suppression localStorage config Supabase:', e);
   }
 }
 
 export function checkIsSupabaseConfigured(): boolean {
-  const { url, anonKey } = getEffectiveConfig();
-  return Boolean(
-    url && 
-    anonKey && 
-    url.startsWith('http') &&
-    !url.includes('placeholder')
-  );
+  try {
+    const { url, anonKey } = getEffectiveConfig();
+    const configured = Boolean(
+      url && 
+      anonKey && 
+      url.startsWith('http') &&
+      !url.includes('placeholder')
+    );
+    isSupabaseConfigured = configured;
+    return configured;
+  } catch {
+    return false;
+  }
 }
 
-export const isSupabaseConfigured = checkIsSupabaseConfigured();
+export let isSupabaseConfigured: boolean = checkIsSupabaseConfigured();
 
 export function getSupabaseConfigStatus(): {
   isConfigured: boolean;
@@ -57,48 +91,67 @@ export function getSupabaseConfigStatus(): {
   isCustomOverride: boolean;
   origin: string;
 } {
-  const { url, anonKey } = getEffectiveConfig();
-  const configured = Boolean(url && anonKey && url.startsWith('http') && !url.includes('placeholder'));
-  const isCustom = typeof window !== 'undefined' && Boolean(localStorage.getItem('gogbo_v2_custom_supabase_url'));
-  return {
-    isConfigured: configured,
-    url: url ? url.replace(/^(https?:\/\/[^/]+).*/, '$1') : '',
-    hasAnonKey: Boolean(anonKey && anonKey.length > 20),
-    isCustomOverride: isCustom,
-    origin: typeof window !== 'undefined' ? window.location.origin : '',
-  };
+  try {
+    const { url, anonKey } = getEffectiveConfig();
+    const configured = Boolean(url && anonKey && url.startsWith('http') && !url.includes('placeholder'));
+    let isCustom = false;
+    try {
+      isCustom = typeof window !== 'undefined' && Boolean(localStorage.getItem('gogbo_v2_custom_supabase_url'));
+    } catch {}
+    
+    return {
+      isConfigured: configured,
+      url: url ? url.replace(/^(https?:\/\/[^/]+).*/, '$1') : '',
+      hasAnonKey: Boolean(anonKey && anonKey.length > 20),
+      isCustomOverride: isCustom,
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+    };
+  } catch {
+    return {
+      isConfigured: false,
+      url: '',
+      hasAnonKey: false,
+      isCustomOverride: false,
+      origin: '',
+    };
+  }
 }
 
 let clientInstance: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient | null {
-  const { url, anonKey } = getEffectiveConfig();
-  if (!url || !anonKey || !url.startsWith('http') || url.includes('placeholder')) {
+  try {
+    const { url, anonKey } = getEffectiveConfig();
+    if (!url || !anonKey || !url.startsWith('http') || url.includes('placeholder')) {
+      return null;
+    }
+    if (!clientInstance) {
+      clientInstance = createClient(url, anonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      });
+    }
+    return clientInstance;
+  } catch (err) {
+    console.warn('Erreur initialisation client Supabase:', err);
     return null;
   }
-  if (!clientInstance) {
-    clientInstance = createClient(url, anonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
-  }
-  return clientInstance;
 }
 
 export async function testSupabaseConnection(): Promise<{ ok: boolean; message: string; details?: Record<string, unknown> }> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return {
-      ok: false,
-      message: "Variables Supabase non configurées dans l'environnement (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Utilisation du stockage local persistant actif.",
-      details: { isConfigured: false },
-    };
-  }
-
   try {
+    const client = getSupabaseClient();
+    if (!client) {
+      return {
+        ok: false,
+        message: "Variables Supabase non configurées dans l'environnement (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Utilisation du stockage local persistant actif.",
+        details: { isConfigured: false },
+      };
+    }
+
     const t0 = performance.now();
     const { data, error, count } = await client.from('classes').select('*', { count: 'exact', head: true });
     const latency = Math.round(performance.now() - t0);

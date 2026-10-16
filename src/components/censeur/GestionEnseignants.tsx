@@ -422,7 +422,7 @@ export const GestionEnseignants: React.FC = () => {
             <form onSubmit={handleSave} className="p-5 space-y-4 text-xs sm:text-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Nom de famille <span className="text-red-500">*</span></label>
+                  <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">Nom de famille <span className="text-red-600 font-black">*</span></label>
                   <input
                     id="modal-prof-nom"
                     type="text"
@@ -430,12 +430,12 @@ export const GestionEnseignants: React.FC = () => {
                     placeholder="Ex: DOSSOU-YOVO"
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm"
+                    className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg uppercase focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white text-slate-900 placeholder:text-slate-500 font-medium shadow-2xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Prénom(s) <span className="text-red-500">*</span></label>
+                  <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">Prénom(s) <span className="text-red-600 font-black">*</span></label>
                   <input
                     id="modal-prof-prenom"
                     type="text"
@@ -443,13 +443,13 @@ export const GestionEnseignants: React.FC = () => {
                     placeholder="Ex: Clément"
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm"
+                    className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white text-slate-900 placeholder:text-slate-500 font-medium shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Email académique officiel <span className="text-red-500">*</span></label>
+                <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">Email académique officiel (Identifiant) <span className="text-red-600 font-black">*</span></label>
                 <input
                   id="modal-prof-email"
                   type="email"
@@ -457,29 +457,29 @@ export const GestionEnseignants: React.FC = () => {
                   placeholder="Ex: c.dossou@ceggogbo.bj"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg lowercase focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg lowercase focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white text-slate-900 placeholder:text-slate-500 font-medium shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Numéro de téléphone</label>
+                <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">Numéro de téléphone</label>
                 <input
                   id="modal-prof-telephone"
                   type="tel"
                   placeholder="Ex: +229 97 00 00 00"
                   value={telephone}
                   onChange={(e) => setTelephone(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg text-xs sm:text-sm bg-white text-slate-900 placeholder:text-slate-500 font-medium shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Rôle administratif attribué <span className="text-red-500">*</span></label>
+                <label className="block text-slate-800 font-bold mb-1.5 text-xs sm:text-sm">Rôle administratif attribué <span className="text-red-600 font-black">*</span></label>
                 <select
                   id="modal-prof-role"
                   value={role}
                   onChange={(e) => setRole(e.target.value as RoleAdmin)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white"
+                  className="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm bg-white text-slate-900 font-medium shadow-2xs"
                 >
                   <option value="ENSEIGNANT">Enseignant</option>
                   <option value="CENSEUR">Censeur</option>
