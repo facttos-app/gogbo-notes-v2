@@ -52,7 +52,10 @@ export const ConfigSupabaseModal: React.FC<ConfigSupabaseModalProps> = ({ isOpen
 
   const handleSave = () => {
     if (!config.url || !config.anonKey) {
-      alert("Veuillez renseigner l'URL Supabase et la clé Anon.");
+      setTestResult({
+        ok: false,
+        message: "Veuillez renseigner à la fois l'URL Supabase et la clé Anon publique.",
+      });
       return;
     }
     saveCustomSupabaseConfig(config.url, config.anonKey);

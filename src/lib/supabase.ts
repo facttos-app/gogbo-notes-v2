@@ -8,16 +8,50 @@ const readEnvVar = (value: unknown): string => {
   return '';
 };
 
-// Accès explicite statique pour permettre le remplacement au build Vite sans dépendance à process.env
-const staticUrl = 
-  readEnvVar(import.meta.env?.VITE_SUPABASE_URL) || 
-  readEnvVar(import.meta.env?.NEXT_PUBLIC_SUPABASE_URL) || 
-  '';
+// Accès universel et sécurisé multi-environnements (Vite Client, Vercel, Node, SSR)
+// Permet à la fois le remplacement statique natif de Vite au build et la sécurité à l'exécution
+const rawUrl = (() => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    }
+  } catch {}
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    }
+  } catch {}
+  return '';
+})();
 
-const staticAnonKey = 
-  readEnvVar(import.meta.env?.VITE_SUPABASE_ANON_KEY) || 
-  readEnvVar(import.meta.env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) || 
-  '';
+const rawAnonKey = (() => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return (
+        import.meta.env.VITE_SUPABASE_ANON_KEY || 
+        import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+        import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+        ''
+      );
+    }
+  } catch {}
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return (
+        process.env.VITE_SUPABASE_ANON_KEY || 
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+        ''
+      );
+    }
+  } catch {}
+  return '';
+})();
+
+const staticUrl = readEnvVar(rawUrl);
+const staticAnonKey = readEnvVar(rawAnonKey);
+
+
 
 // Résolution de configuration (avec possibilité de configuration souveraine locale)
 export function getEffectiveConfig(): { url: string; anonKey: string } {
@@ -141,39 +175,145 @@ export function getSupabaseClient(): SupabaseClient | null {
   }
 }
 
-export async function testSupabaseConnection(): Promise<{ ok: boolean; message: string; details?: Record<string, unknown> }> {
-  try {
-    const client = getSupabaseClient();
-    if (!client) {
-      return {
-        ok: false,
-        message: "Variables Supabase non configurées dans l'environnement (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Utilisation du stockage local persistant actif.",
-        details: { isConfigured: false },
-      };
-    }
+export type DiagnosticCategory = 
+  | 'URL_ABSENTE'
+  | 'URL_INVALIDE'
+  | 'CLE_ABSENTE'
+  | 'ERREUR_RESEAU'
+  | 'PROJET_INACCESSIBLE'
+  | 'AUTHENTIFICATION'
+  | 'RLS_PERMISSION'
+  | 'CONNEXION_REUSSIE';
 
+export async function testSupabaseConnection(): Promise<{ 
+  ok: boolean; 
+  category: DiagnosticCategory;
+  message: string; 
+  details?: Record<string, unknown> 
+}> {
+  const { url, anonKey } = getEffectiveConfig();
+
+  // 1. Diagnostic URL
+  if (!url) {
+    return {
+      ok: false,
+      category: 'URL_ABSENTE',
+      message: "URL du projet absente : La variable VITE_SUPABASE_URL n'est pas renseignée dans cet environnement.",
+      details: { hasUrl: false, hasAnonKey: Boolean(anonKey) },
+    };
+  }
+
+  if (!url.startsWith('https://') && !url.startsWith('http://')) {
+    return {
+      ok: false,
+      category: 'URL_INVALIDE',
+      message: "URL invalide : L'adresse du projet Supabase doit impérativement débuter par https://",
+      details: { urlProvided: url.replace(/^(https?:\/\/[^/]+).*/, '$1') },
+    };
+  }
+
+  // 2. Diagnostic Clé publique
+  if (!anonKey) {
+    return {
+      ok: false,
+      category: 'CLE_ABSENTE',
+      message: "Clé publique absente : La variable VITE_SUPABASE_ANON_KEY n'est pas renseignée dans cet environnement.",
+      details: { hasUrl: true, hasAnonKey: false },
+    };
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      ok: false,
+      category: 'URL_INVALIDE',
+      message: "Échec d'initialisation : Impossible d'instancier le client avec les paramètres fournis.",
+      details: { isConfigured: false },
+    };
+  }
+
+  // 3. Test de communication réelle non-destructive
+  try {
     const t0 = performance.now();
-    const { data, error, count } = await client.from('classes').select('*', { count: 'exact', head: true });
+    const { error, count, status } = await client
+      .from('classes')
+      .select('*', { count: 'exact', head: true });
     const latency = Math.round(performance.now() - t0);
 
     if (error) {
-      return { 
-        ok: false, 
-        message: `Erreur PostgreSQL / Supabase : ${error.message} (Code: ${error.code || 'N/A'})`,
-        details: { error: error.message, code: error.code, latencyMs: latency }
+      const errLower = error.message.toLowerCase();
+      const code = error.code || '';
+
+      // Problème d'authentification / clé publique refusée
+      if (
+        code === 'PGRST301' || 
+        status === 401 || 
+        errLower.includes('jwt') || 
+        errLower.includes('apikey') || 
+        errLower.includes('invalid api key') ||
+        errLower.includes('unauthorized')
+      ) {
+        return {
+          ok: false,
+          category: 'AUTHENTIFICATION',
+          message: `Erreur d'authentification Supabase (HTTP ${status || 401}) : La clé publique Anon est rejetée ou invalide.`,
+          details: { code, status, latencyMs: latency },
+        };
+      }
+
+      // Problème de permissions / RLS
+      if (
+        code === '42501' || 
+        status === 403 || 
+        errLower.includes('permission denied') || 
+        errLower.includes('row-level security') ||
+        errLower.includes('rls')
+      ) {
+        return {
+          ok: false,
+          category: 'RLS_PERMISSION',
+          message: `Politiques RLS PostgreSQL (Code ${code}) : Accès anonyme restreint sur la table des classes. Connexion établie mais permissions spécifiques requises.`,
+          details: { code, status, latencyMs: latency },
+        };
+      }
+
+      return {
+        ok: false,
+        category: 'PROJET_INACCESSIBLE',
+        message: `Erreur PostgreSQL / Supabase : ${error.message} (Code: ${code || 'N/A'})`,
+        details: { code, status, latencyMs: latency },
       };
     }
-    return { 
-      ok: true, 
-      message: `Connexion à PostgreSQL / Supabase réussie (${latency} ms). ${count !== null ? count + ' classes trouvées.' : ''}`,
-      details: { count, latencyMs: latency, isConfigured: true }
+
+    return {
+      ok: true,
+      category: 'CONNEXION_REUSSIE',
+      message: `Connexion réelle certifiée opérationnelle (${latency} ms). ${count !== null ? count + ' classes dénombrées dans la base centrale.' : ''}`,
+      details: { count, latencyMs: latency, isConfigured: true },
     };
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    return { 
-      ok: false, 
-      message: `Échec de connexion réseau Supabase: ${errMsg}`,
-      details: { error: errMsg }
+    const errLower = errMsg.toLowerCase();
+
+    if (
+      errLower.includes('failed to fetch') || 
+      errLower.includes('network') || 
+      errLower.includes('enotfound') ||
+      errLower.includes('timeout')
+    ) {
+      return {
+        ok: false,
+        category: 'ERREUR_RESEAU',
+        message: `Erreur réseau : Le serveur Supabase est inaccessible (échec de connexion, timeout ou hôte introuvable).`,
+        details: { error: errMsg },
+      };
+    }
+
+    return {
+      ok: false,
+      category: 'PROJET_INACCESSIBLE',
+      message: `Projet inaccessible : ${errMsg}`,
+      details: { error: errMsg },
     };
   }
 }

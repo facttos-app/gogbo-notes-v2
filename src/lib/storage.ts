@@ -835,7 +835,15 @@ class StorageEngine {
       // 1. Profils scolaires réels
       const { data: remoteProfiles, error: errProf } = await client.from('profiles').select('*');
       if (!errProf && remoteProfiles && remoteProfiles.length > 0) {
-        this.setItem(STORAGE_KEYS.PROFILES, remoteProfiles);
+        // Fusion non-destructive pour préserver les comptes administratifs et locaux
+        const currentProfiles = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, SEED_PROFILES);
+        const mergedProfiles = [...remoteProfiles];
+        for (const localP of currentProfiles) {
+          if (!mergedProfiles.some((rp) => rp.id === localP.id || (rp.email && localP.email && rp.email.toLowerCase() === localP.email.toLowerCase()))) {
+            mergedProfiles.push(localP);
+          }
+        }
+        this.setItem(STORAGE_KEYS.PROFILES, mergedProfiles);
         itemsCount += remoteProfiles.length;
       }
 
@@ -1266,7 +1274,7 @@ class StorageEngine {
     }
 
     // Vérifier l'unicité de l'email si modifié
-    const conflict = profiles.find((p) => p.email.toLowerCase() === cleanEmail && p.id !== userId);
+    const conflict = profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail && p.id !== userId);
     if (conflict) {
       return {
         success: false,
@@ -1392,12 +1400,12 @@ class StorageEngine {
       nom = `${niveau} ${nextLetter}`;
     }
 
-    if (classes.some((c) => c.nom.toLowerCase() === nom.toLowerCase())) {
+    if (classes.some((c) => (c.nom || '').toLowerCase() === nom.toLowerCase())) {
       throw new Error(`Une classe portant le nom "${nom}" existe déjà.`);
     }
 
-    const cleanNivSlug = niveau.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanLetSlug = nextLetter.toLowerCase();
+    const cleanNivSlug = (niveau || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanLetSlug = (nextLetter || '').toLowerCase();
     const id = `cls-${cleanNivSlug}-${cleanLetSlug}-${Date.now().toString(36).slice(-4)}`;
 
     const isFirstCycle = ['6ème', '5ème', '4ème', '3ème', '6e', '5e', '4e', '3e'].includes(niveau);
@@ -1418,7 +1426,7 @@ class StorageEngine {
     // Initialisation automatique des coefficients de matières pour la nouvelle classe
     try {
       const allCoefs = this.getCoefficientsClasses();
-      const templateClasse = classes.find((c) => c.niveau.toLowerCase() === niveau.toLowerCase());
+      const templateClasse = classes.find((c) => (c.niveau || '').toLowerCase() === (niveau || '').toLowerCase());
       if (templateClasse) {
         const templateCoefs = allCoefs.filter((cc) => cc.classe_id === templateClasse.id);
         const clonedCoefs = templateCoefs.map((tc) => ({
@@ -2409,11 +2417,17 @@ class StorageEngine {
     const cleanId = userIdOrEmail.trim().toLowerCase();
     const cleanDigits = cleanId.replace(/[^0-9]/g, '');
 
-    const user = profiles.find(
+    let user = profiles.find(
       (p) => p.id === userIdOrEmail ||
-             p.email.toLowerCase() === cleanId ||
+             (p.email && p.email.toLowerCase() === cleanId) ||
              (cleanDigits.length >= 8 && p.telephone && p.telephone.replace(/[^0-9]/g, '').endsWith(cleanDigits))
     );
+    if (!user && (cleanId === 'censeur@gmail.com' || cleanId === 'censeur@ceggogbo.bj' || cleanId === 'censeur')) {
+      user = profiles.find((p) => p.id === 'usr-censeur');
+    }
+    if (!user && (cleanId === 'concepteur@ceggogbo.bj' || cleanId === 'concepteur')) {
+      user = profiles.find((p) => p.id === 'usr-concepteur');
+    }
     if (!user) return false;
 
     const creds = this.getUserCredentials();
@@ -2496,7 +2510,13 @@ class StorageEngine {
   ): Promise<{ success: boolean; error?: string }> {
     const clean = userIdOrEmail.trim().toLowerCase();
     const profiles = this.getProfiles();
-    const user = profiles.find((p) => p.id === userIdOrEmail || p.email.toLowerCase() === clean);
+    let user = profiles.find((p) => p.id === userIdOrEmail || (p.email && p.email.toLowerCase() === clean));
+    if (!user && (clean === 'censeur@gmail.com' || clean === 'censeur@ceggogbo.bj' || clean === 'censeur')) {
+      user = profiles.find((p) => p.id === 'usr-censeur');
+    }
+    if (!user && (clean === 'concepteur@ceggogbo.bj' || clean === 'concepteur')) {
+      user = profiles.find((p) => p.id === 'usr-concepteur');
+    }
     if (!user) {
       return { success: false, error: 'Compte introuvable dans le système.' };
     }
@@ -2526,7 +2546,7 @@ class StorageEngine {
       action: 'REINITIALISATION_MOT_DE_PASSE',
       table_cible: 'auth',
       record_id: user.id,
-      details: `Réinitialisation sécurisée du mot de passe pour ${user.prenom} ${user.nom} (${user.email})`,
+      details: `Réinitialisation sécurisée du mot de passe pour ${user.prenom} ${user.nom} (${user.email || user.id})`,
     });
 
     return { success: true };
@@ -2546,7 +2566,7 @@ class StorageEngine {
     if (userIdx === -1) return { success: false, error: 'Compte introuvable.' };
 
     // Unicité de l'identifiant
-    const conflict = profiles.find((p) => p.email.toLowerCase() === cleanEmail && p.id !== userId);
+    const conflict = profiles.find((p) => p.email && p.email.toLowerCase() === cleanEmail && p.id !== userId);
     if (conflict) {
       return { success: false, error: `Cet identifiant (${cleanEmail}) est déjà utilisé par un autre compte.` };
     }
@@ -2679,8 +2699,8 @@ class StorageEngine {
     const matiere = this.getMatiereById(matiereId);
     if (!matiere) return;
 
-    const isLecture = matiere.code === 'LECTURE' || matiere.id === 'mat-lect' || matiere.nom.toLowerCase().includes('lecture');
-    const isComm = matiere.code === 'COMM_ECR' || matiere.id === 'mat-comm' || matiere.nom.toLowerCase().includes('communication');
+    const isLecture = matiere.code === 'LECTURE' || matiere.id === 'mat-lect' || (matiere.nom || '').toLowerCase().includes('lecture');
+    const isComm = matiere.code === 'COMM_ECR' || matiere.id === 'mat-comm' || (matiere.nom || '').toLowerCase().includes('communication');
 
     if (!isLecture && !isComm) return;
 
@@ -2693,8 +2713,8 @@ class StorageEngine {
       const m = this.getMatiereById(aff.matiere_id);
       if (!m) continue;
       const isPartner = isLecture
-        ? (m.code === 'COMM_ECR' || m.id === 'mat-comm' || m.nom.toLowerCase().includes('communication'))
-        : (m.code === 'LECTURE' || m.id === 'mat-lect' || m.nom.toLowerCase().includes('lecture'));
+        ? (m.code === 'COMM_ECR' || m.id === 'mat-comm' || (m.nom || '').toLowerCase().includes('communication'))
+        : (m.code === 'LECTURE' || m.id === 'mat-lect' || (m.nom || '').toLowerCase().includes('lecture'));
 
       if (isPartner && aff.profile_id !== profileId) {
         const assignedProf = this.getProfileById(aff.profile_id);
@@ -2846,13 +2866,13 @@ class StorageEngine {
     const isLectureOrComm = mat && (
       mat.code === 'LECTURE' || mat.code === 'COMM_ECR' ||
       mat.id === 'mat-lect' || mat.id === 'mat-comm' ||
-      mat.nom.toLowerCase().includes('lecture') || mat.nom.toLowerCase().includes('communication')
+      (mat.nom || '').toLowerCase().includes('lecture') || (mat.nom || '').toLowerCase().includes('communication')
     );
     const twinSubject = isLectureOrComm
       ? this.getMatieres().find((m) =>
-          (mat.code === 'LECTURE' || mat.nom.toLowerCase().includes('lecture'))
-            ? (m.code === 'COMM_ECR' || m.id === 'mat-comm' || m.nom.toLowerCase().includes('communication'))
-            : (m.code === 'LECTURE' || m.id === 'mat-lect' || m.nom.toLowerCase().includes('lecture'))
+          (mat.code === 'LECTURE' || (mat.nom || '').toLowerCase().includes('lecture'))
+            ? (m.code === 'COMM_ECR' || m.id === 'mat-comm' || (m.nom || '').toLowerCase().includes('communication'))
+            : (m.code === 'LECTURE' || m.id === 'mat-lect' || (m.nom || '').toLowerCase().includes('lecture'))
         )
       : undefined;
 

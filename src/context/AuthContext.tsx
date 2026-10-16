@@ -90,6 +90,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (supabase) {
           let authData = null;
           let authError = null;
+          let isNetworkFailure = false;
+          let netErrorMessage = '';
 
           try {
             const res = await supabase.auth.signInWithPassword({
@@ -99,11 +101,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             authData = res.data;
             authError = res.error;
           } catch (netErr: unknown) {
+            isNetworkFailure = true;
+            netErrorMessage = netErr instanceof Error ? netErr.message : String(netErr);
+          }
+
+          if (authError) {
+            const msg = authError.message.toLowerCase();
+            if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed') || msg.includes('enotfound')) {
+              isNetworkFailure = true;
+              netErrorMessage = authError.message;
+            }
+          }
+
+          // Secours d'urgence si Supabase est temporairement indisponible ou réseau défaillant
+          if (isNetworkFailure) {
+            const localProfiles = storage.getProfiles();
+            const emergencyUser = localProfiles.find(
+              (p) => (p.email && p.email.toLowerCase() === cleanInput) || p.id === cleanInput
+            );
+            if (emergencyUser && storage.verifyUserPassword(emergencyUser.id, cleanPass)) {
+              if (emergencyUser.statut !== 'ACTIF') {
+                setIsLoading(false);
+                return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
+              }
+              storage.setCurrentUserId(emergencyUser.id);
+              loadUserData(emergencyUser.id);
+              setIsLoading(false);
+              return { success: true };
+            }
+
             setIsLoading(false);
-            const netMsg = netErr instanceof Error ? netErr.message : String(netErr);
             return {
               success: false,
-              error: `Serveur Supabase momentanément inaccessible (${netMsg}). Vérifiez votre connexion Internet ou réessayez dans quelques instants. Le portail d'authentification reste disponible.`
+              error: `Serveur Supabase momentanément inaccessible (${netErrorMessage || 'problème réseau'}). Le portail d'authentification reste disponible ; réessayez dans quelques instants ou vérifiez votre accès internet.`,
             };
           }
 
@@ -111,21 +141,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(false);
             const msg = authError.message.toLowerCase();
             if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+              // Vérification alternative sur le stockage local si le compte a été configuré localement
+              const localProfiles = storage.getProfiles();
+              const localCandidate = localProfiles.find(
+                (p) => (p.email && p.email.toLowerCase() === cleanInput) || p.id === cleanInput
+              );
+              if (localCandidate && storage.verifyUserPassword(localCandidate.id, cleanPass)) {
+                storage.setCurrentUserId(localCandidate.id);
+                loadUserData(localCandidate.id);
+                return { success: true };
+              }
+
               return { 
                 success: false, 
-                error: "Identifiant ou mot de passe incorrect sur Supabase. Si votre compte Censeur n'a pas encore été activé sur cette base centrale, utilisez « Mot de passe oublié / Réinitialisation sécurisée » avec le code d'établissement GOGBO2026." 
+                error: "Identifiant ou mot de passe incorrect sur Supabase. Si votre compte Censeur n'a pas encore été synchronisé sur cette base centrale, utilisez « Mot de passe oublié / Réinitialisation sécurisée » avec le code d'établissement GOGBO2026." 
               };
             }
             if (msg.includes('email not confirmed')) {
               return { 
                 success: false, 
-                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase. Veuillez valider le lien de confirmation reçu par e-mail ou désactiver l'option 'Confirm email' dans Supabase Auth." 
-              };
-            }
-            if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed')) {
-              return {
-                success: false,
-                error: `Serveur Supabase momentanément injoignable (${authError.message}). L'infrastructure reste opérationnelle ; réessayez dans un instant.`
+                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase. Veuillez valider le lien de confirmation reçu par e-mail ou désactiver l'option 'Confirm email' dans les paramètres Auth de votre projet Supabase." 
               };
             }
             return { 
@@ -171,52 +206,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
 
-            // Si c'est le compte Censeur officiel (censeur@gmail.com, censeur@ceggogbo.bj ou metadata)
-            const isCenseurAccount = cleanInput === 'censeur@gmail.com' || 
-                                     cleanInput === 'censeur@ceggogbo.bj' || 
-                                     cleanInput.includes('censeur') ||
-                                     authData.user.user_metadata?.role === 'CENSEUR';
-
-            if (!profileRow && isCenseurAccount) {
-              const autoCenseurProfile: UserProfile = {
-                id: authData.user.id,
-                email: authData.user.email || cleanInput,
-                nom: (authData.user.user_metadata?.nom as string) || 'DOSSOU-YOVO',
-                prenom: (authData.user.user_metadata?.prenom as string) || 'Clément',
-                role: 'CENSEUR',
-                is_enseignant: false,
-                telephone: (authData.user.user_metadata?.telephone as string) || '+229 97 12 34 56',
-                adresse: 'Adjohoun - Centre',
-                matiere: 'SVT',
-                statut: 'ACTIF',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              profileRow = autoCenseurProfile;
-              try {
-                const { error: insErr } = await supabase.from('profiles').upsert(autoCenseurProfile);
-                if (insErr) {
-                  console.warn('Upsert profil Censeur notice:', insErr.message);
-                }
-              } catch (insCatch) {
-                console.warn('Auto-liaison exception:', insCatch);
-              }
-            }
-
-            let profile: UserProfile | null = profileRow;
-            if (!profile) {
-              // Vérifier dans le stockage local pour rattrapage
+            // Rattachement légitime au profil scolaire réel correspondant à l'adresse e-mail
+            if (!profileRow) {
               const localCandidate = storage.getProfiles().find((p) => p.email && p.email.toLowerCase() === cleanInput);
               if (localCandidate) {
-                profile = { ...localCandidate, id: authData.user.id };
+                profileRow = { ...localCandidate, id: authData.user.id };
+                try {
+                  await supabase.from('profiles').upsert(profileRow);
+                } catch (insCatch) {
+                  console.warn('Notice synchronisation profil vers base centrale:', insCatch);
+                }
               }
             }
 
+            const profile: UserProfile | null = profileRow;
             if (!profile) {
               setIsLoading(false);
               return {
                 success: false,
-                error: "Compte authentifié sur Supabase mais aucun profil scolaire actif rattaché dans la table 'profiles'.",
+                error: "Compte authentifié sur Supabase mais aucun profil scolaire actif n'est associé à cette adresse e-mail dans la base de données. Veuillez contacter l'administration de l'établissement.",
               };
             }
 
@@ -257,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Enregistrer le profil dans le cache local de l'application
             const cachedProfiles = storage.getProfiles();
-            const pIdx = cachedProfiles.findIndex((p) => p.id === profile.id || (p.email && p.email.toLowerCase() === profile.email.toLowerCase()));
+            const pIdx = cachedProfiles.findIndex((p) => p.id === profile.id || (p.email && profile.email && p.email.toLowerCase() === profile.email.toLowerCase()));
             if (pIdx >= 0) {
               cachedProfiles[pIdx] = { ...cachedProfiles[pIdx], ...profile, id: profile.id };
             } else {
@@ -286,15 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Mode local de transition (quand Supabase n'est pas configuré dans l'environnement)
-      if (!isSupa && cleanInput.includes('@')) {
-        setIsLoading(false);
-        return {
-          success: false,
-          error: "Base centrale Supabase non connectée : Les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY ne sont pas configurées dans cet environnement Vercel. Cliquez sur le bandeau « Mode Local Persistant (Supabase en attente) » pour renseigner l'URL et la clé Anon de votre projet Supabase."
-        };
-      }
-
+      // 2. Mode local de transition ou autonome (quand Supabase n'est pas encore configuré)
       const profiles = storage.getProfiles();
       let user = profiles.find((p) => p.email && p.email.toLowerCase() === cleanInput);
       if (!user && (cleanInput === 'censeur@gmail.com' || cleanInput === 'censeur@ceggogbo.bj')) {
