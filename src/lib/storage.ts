@@ -4721,4 +4721,176 @@ class StorageEngine {
     id: string,
     operator: UserProfile,
     motif?: string
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+  ): Promise<ProfesseurPrincipal> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de retirer un Professeur Principal.");
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error("Attribution de Professeur Principal introuvable.");
+
+    const current = list[idx];
+    const teacher = this.getProfileById(current.profile_id);
+    const classe = this.getClasseById(current.classe_id);
+    const now = new Date().toISOString();
+
+    const updated: ProfesseurPrincipal = {
+      ...current,
+      statut: 'CLOTURE',
+      date_fin: now.split('T')[0],
+      motif_fin: motif || 'Retrait par décision du Censeur',
+      updated_at: now,
+    };
+
+    list[idx] = updated;
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'RETRAIT_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Retrait PP (${current.annee_scolaire}) : Fin de fonction PP pour ${teacher?.nom} ${teacher?.prenom} en ${classe?.nom}${motif ? ` (Motif : ${motif})` : ''}`,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').update({
+          statut: 'CLOTURE',
+          date_fin: updated.date_fin,
+          motif_fin: updated.motif_fin,
+          updated_at: updated.updated_at,
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Sync Supabase update PP failed:', err);
+      }
+    }
+
+    return updated;
+  }
+
+  public async deleteProfesseurPrincipal(id: string, operator: UserProfile): Promise<boolean> {
+    if (!this.canAdminister(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur peut supprimer un enregistrement.");
+    }
+
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const item = list.find((p) => p.id === id);
+    if (!item) return false;
+
+    const teacher = this.getProfileById(item.profile_id);
+    const classe = this.getClasseById(item.classe_id);
+
+    const updated = list.filter((p) => p.id !== id);
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, updated);
+
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: 'SUPPRESSION_PROFESSEUR_PRINCIPAL',
+      table_cible: 'professeurs_principaux',
+      record_id: id,
+      details: `Suppression enregistrement PP : ${teacher?.nom} ${teacher?.prenom} (${classe?.nom} - ${item.annee_scolaire})`,
+    });
+
+    const supabase = getSupabaseClient();
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('professeurs_principaux').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Sync Supabase delete PP failed:', err);
+      }
+    }
+
+    return true;
+  }
+
+  // --- UTILITAIRES / EXPORT / RESET ---
+  public resetToDefaults(): void {
+    this.rawRemove(STORAGE_KEYS.VERSION);
+    this.init();
+  }
+
+  public exportDatabaseJSON(): string {
+    const data = {
+      parametres: this.getParametres(),
+      annees_scolaires: this.getAnneesScolaires(),
+      profiles: this.getProfiles(),
+      classes: this.getClasses(),
+      matieres: this.getMatieres(),
+      coefficients_classes: this.getCoefficientsClasses(),
+      eleves: this.getEleves(),
+      inscriptions: this.getInscriptions(),
+      periodes: this.getPeriodes(),
+      affectations: this.getAffectations(),
+      notes: this.getNotes(),
+      presences: this.getPresences(),
+      presences_enseignants: this.getPresencesEnseignants(),
+      professeurs_principaux: this.getProfesseursPrincipaux(),
+      paiements: this.getPaiements(),
+      contributions: this.getContributions(),
+      depenses: this.getDepenses(),
+      parents: this.getParents(),
+      parent_eleves: this.getParentEleves(),
+      incidents_disciplinaires: this.getIncidentsDisciplinaires(),
+      notifications_parents: this.getNotificationsParents(),
+      audit_logs: this.getAuditLogs(),
+      exported_at: new Date().toISOString(),
+      version: '2.5.0',
+    };
+    return JSON.stringify(data, null, 2);
+  }
+
+  public importDatabaseJSON(jsonStr: string, operator: UserProfile): void {
+    try {
+      const data = JSON.parse(jsonStr);
+      if (data.profiles && data.classes && data.eleves) {
+        if (data.parametres) this.setItem(STORAGE_KEYS.PARAMETRES, data.parametres);
+        if (data.annees_scolaires) this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, data.annees_scolaires);
+        this.setItem(STORAGE_KEYS.PROFILES, data.profiles);
+        this.setItem(STORAGE_KEYS.CLASSES, data.classes);
+        this.setItem(STORAGE_KEYS.MATIERES, data.matieres);
+        if (data.coefficients_classes) this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, data.coefficients_classes);
+        this.setItem(STORAGE_KEYS.ELEVES, data.eleves);
+        if (data.inscriptions) this.setItem(STORAGE_KEYS.INSCRIPTIONS, data.inscriptions);
+        this.setItem(STORAGE_KEYS.PERIODES, data.periodes);
+        this.setItem(STORAGE_KEYS.AFFECTATIONS, data.affectations);
+        this.setItem(STORAGE_KEYS.NOTES, data.notes);
+        if (data.presences) this.setItem(STORAGE_KEYS.PRESENCES, data.presences);
+        if (data.presences_enseignants) this.setItem(STORAGE_KEYS.PRESENCES_ENSEIGNANTS, data.presences_enseignants);
+        if (data.professeurs_principaux) this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, data.professeurs_principaux);
+        if (data.paiements) this.setItem(STORAGE_KEYS.PAIEMENTS, data.paiements);
+        if (data.contributions) this.setItem(STORAGE_KEYS.CONTRIBUTIONS, data.contributions);
+        if (data.depenses) this.setItem(STORAGE_KEYS.DEPENSES, data.depenses);
+        if (data.parents) this.setItem(STORAGE_KEYS.PARENTS, data.parents);
+        if (data.parent_eleves) this.setItem(STORAGE_KEYS.PARENT_ELEVES, data.parent_eleves);
+        if (data.incidents_disciplinaires) this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, data.incidents_disciplinaires);
+        if (data.notifications_parents) this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, data.notifications_parents);
+        this.setItem(STORAGE_KEYS.AUDIT_LOGS, data.audit_logs || []);
+
+        this.addAuditLog({
+          user_id: operator.id,
+          user_nom: `${operator.nom} ${operator.prenom}`,
+          user_role: operator.role,
+          action: 'IMPORT_BASE_DONNEES',
+          table_cible: 'system',
+          details: 'Restauration complète de la base de données depuis une archive JSON',
+        });
+      }
+    } catch (e) {
+      throw new Error(`Erreur lors de l'import: ${e instanceof Error ? e.message : 'Fichier JSON invalide'}`);
+    }
+  }
+}
+
+export const storage = new StorageEngine();
+try {
+  storage.init();
+} catch (e) {
+  console.warn('Storage initial bootstrap notice:', e);
+}
