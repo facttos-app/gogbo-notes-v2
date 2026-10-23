@@ -54,7 +54,18 @@ const staticAnonKey = readEnvVar(rawAnonKey);
 
 
 // Résolution de configuration (avec possibilité de configuration souveraine locale)
+// Projet Supabase de production (CEG GOGBO). L'URL et la clé « publishable » sont PUBLIQUES par conception :
+// la protection des données repose sur les politiques RLS, jamais sur le secret de cette clé.
+// Ne jamais placer ici la « Secret key » ni la clé service_role.
+const PROD_SUPABASE_URL = 'https://kndlxabmtwaqxicwzsdl.supabase.co';
+const PROD_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_rUUB2uVUTie0yFEXX6TE9A_5tYVdoZp';
+
 export function getEffectiveConfig(): { url: string; anonKey: string } {
+  // Configuration de production prioritaire : ni variables obsolètes ni réglage local ne la remplacent.
+  if (PROD_SUPABASE_URL && PROD_SUPABASE_PUBLISHABLE_KEY && !PROD_SUPABASE_PUBLISHABLE_KEY.startsWith('__')) {
+    return { url: PROD_SUPABASE_URL, anonKey: PROD_SUPABASE_PUBLISHABLE_KEY };
+  }
+
   let url = staticUrl;
   let anonKey = staticAnonKey;
 
