@@ -80,6 +80,15 @@ export function getAppreciationColor(appreciation: string): { bg: string; text: 
  * 
  * 4. Point obtenu = Moyenne matière × Coefficient
  */
+// Coefficient propre à chaque classe : branché par le moteur de stockage au démarrage.
+// Si aucun coefficient de classe n'existe, le coefficient général de la matière est conservé.
+type CoefficientResolver = (matiereId: string, classeId: string, anneeScolaire: string) => number | null;
+let coefficientResolver: CoefficientResolver | null = null;
+
+export function setCoefficientResolver(resolver: CoefficientResolver | null): void {
+  coefficientResolver = resolver;
+}
+
 export function calculerSyntheseMatiere(matiere: Matiere, notes: Note[]): NoteSyntheseMatiere {
   let interro1: number | null = null;
   let interro2: number | null = null;
@@ -239,11 +248,15 @@ export function calculerBulletinEleve(
       return true;
     });
 
-    const synthese = calculerSyntheseMatiere(mat, notesMatiere);
+    // Coefficient de cette matière DANS CETTE CLASSE (et non le coefficient général)
+    const coefClasse = coefficientResolver ? coefficientResolver(mat.id, classe.id, periode.annee_scolaire) : null;
+    const matEff: Matiere = coefClasse !== null && coefClasse > 0 ? { ...mat, coefficient: coefClasse } : mat;
+
+    const synthese = calculerSyntheseMatiere(matEff, notesMatiere);
 
     if (synthese.points !== null && synthese.moyenne !== null) {
       totalPoints += synthese.points;
-      totalCoefficients += mat.coefficient;
+      totalCoefficients += matEff.coefficient;
     }
 
     matieresNotes.push(synthese);
