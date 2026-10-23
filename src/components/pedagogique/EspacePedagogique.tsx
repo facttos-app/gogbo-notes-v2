@@ -167,14 +167,20 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
     )
   ).join(' • ');
 
+  // Coefficient propre à la classe affichée (et non le coefficient général de la matière)
+  const [coefRefresh, setCoefRefresh] = useState(0);
+  const coefClasse: number = useMemo(() => {
+    if (!matiere) return 1;
+    return classe ? storage.getCoefficientMatiere(matiere.id, classe.id, selectedAnnee.libelle) : matiere.coefficient;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matiere, classe, selectedAnnee.libelle, coefRefresh]);
+
   useEffect(() => {
-    if (matiere) {
-      setNewCoefValue(matiere.coefficient);
-    }
-  }, [matiere?.id, matiere?.coefficient]);
+    setNewCoefValue(coefClasse);
+  }, [coefClasse]);
 
   const handleSaveTeacherCoef = async () => {
-    if (!currentUser || !matiere || (!isAssignedTeacher && !isManager)) return;
+    if (!currentUser || !matiere || !classe || (!isAssignedTeacher && !isManager)) return;
     if (isArchive) {
       setStatusMessage({ type: 'error', text: 'Action refusée en consultation d’archive historique.' });
       return;
@@ -184,12 +190,13 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
       return;
     }
     try {
-      await storage.updateMatiereAsync(matiere.id, { coefficient: Number(newCoefValue) }, currentUser);
+      storage.setCoefficientClasse(classe.id, matiere.id, Number(newCoefValue), selectedAnnee.libelle, currentUser);
+      setCoefRefresh((n: number) => n + 1);
       setIsEditingCoef(false);
       triggerRecalculationVisual();
       setStatusMessage({
         type: 'success',
-        text: `✓ Coefficient de votre discipline "${matiere.nom}" mis à jour (${newCoefValue}).`,
+        text: `✓ Coefficient de « ${matiere.nom} » en ${classe.nom} mis à jour (${newCoefValue}). Les autres classes ne sont pas modifiées.`,
       });
     } catch (e: unknown) {
       setStatusMessage({
@@ -634,14 +641,14 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   </span>
                   <span>•</span>
                   <span className="inline-flex items-center space-x-1.5">
-                    <span>Coefficient : <strong className="text-slate-900">{matiere.coefficient}</strong></span>
+                    <span>Coefficient en {classe?.nom} : <strong className={coefClasse > 0 ? 'text-slate-900' : 'text-amber-700'}>{coefClasse > 0 ? coefClasse : 'non défini'}</strong></span>
                     {canEdit && !isArchive && (
                       <button
                         onClick={() => setIsEditingCoef(!isEditingCoef)}
                         className="text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded font-bold cursor-pointer"
-                        title="Modifier le coefficient de ma propre matière dans cette attribution"
+                        title="Modifier le coefficient de cette matière pour cette classe uniquement"
                       >
-                        {isEditingCoef ? 'Fermer' : '✎ Modifier Coef'}
+                        {isEditingCoef ? 'Fermer' : coefClasse > 0 ? '✎ Modifier Coef' : '✎ Définir le coefficient'}
                       </button>
                     )}
                   </span>
@@ -657,12 +664,13 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
                 {isEditingCoef && canEdit && (
                   <div className="mt-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg flex flex-wrap items-center gap-2 text-xs">
-                    <span className="font-bold text-indigo-900">Nouveau Coefficient pour {matiere.nom} :</span>
+                    <span className="font-bold text-indigo-900">Nouveau coefficient pour {matiere.nom} en {classe?.nom} uniquement :</span>
                     <input
                       type="number"
                       min="1"
                       max="10"
-                      value={newCoefValue}
+                      value={newCoefValue > 0 ? newCoefValue : ''}
+                      placeholder="ex. 2"
                       onChange={(e) => setNewCoefValue(Number(e.target.value))}
                       className="w-16 bg-white border border-slate-300 rounded px-2 py-0.5 font-bold text-slate-900 text-center"
                     />
@@ -881,7 +889,7 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                         }
                       }
 
-                      const points = moyMatiere !== null ? Math.round((moyMatiere * matiere.coefficient) * 100) / 100 : null;
+                      const points = moyMatiere !== null ? Math.round((moyMatiere * coefClasse) * 100) / 100 : null;
                       const appreciation = getAppreciation(moyMatiere);
                       const colorStyle = getAppreciationColor(appreciation);
 
