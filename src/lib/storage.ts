@@ -1246,6 +1246,11 @@ class StorageEngine {
   }
 
   public updateMatiere(id: string, updates: Partial<Matiere>, operator: UserProfile): Matiere {
+    if (updates.coefficient !== undefined) {
+      throw new Error(
+        "Le coefficient n'est plus défini pour toute la matière : chaque enseignant le définit classe par classe dans son espace pédagogique."
+      );
+    }
     const list = this.getMatieres();
     const idx = list.findIndex((m) => m.id === id);
     if (idx === -1) throw new Error('Matière non trouvée');
@@ -1332,7 +1337,9 @@ class StorageEngine {
       }
     }
 
-    return defaultCoef;
+    // Aucun coefficient par défaut : tant que l'enseignant n'a pas défini le coefficient de sa matière
+    // dans cette classe, il vaut 0 (« non défini ») et la matière n'entre pas dans la moyenne générale.
+    return 0;
   }
 
   public setCoefficientClasse(
