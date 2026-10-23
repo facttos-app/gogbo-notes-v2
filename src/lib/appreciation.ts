@@ -81,7 +81,7 @@ export function getAppreciationColor(appreciation: string): { bg: string; text: 
  * 4. Point obtenu = Moyenne matière × Coefficient
  */
 // Coefficient propre à chaque classe : branché par le moteur de stockage au démarrage.
-// Si aucun coefficient de classe n'existe, le coefficient général de la matière est conservé.
+// Aucun coefficient par défaut : non défini = 0, la matière n'entre pas dans la moyenne générale.
 type CoefficientResolver = (matiereId: string, classeId: string, anneeScolaire: string) => number | null;
 let coefficientResolver: CoefficientResolver | null = null;
 
@@ -250,7 +250,7 @@ export function calculerBulletinEleve(
 
     // Coefficient de cette matière DANS CETTE CLASSE (et non le coefficient général)
     const coefClasse = coefficientResolver ? coefficientResolver(mat.id, classe.id, periode.annee_scolaire) : null;
-    const matEff: Matiere = coefClasse !== null && coefClasse > 0 ? { ...mat, coefficient: coefClasse } : mat;
+    const matEff: Matiere = coefClasse !== null ? { ...mat, coefficient: coefClasse } : mat;
 
     const synthese = calculerSyntheseMatiere(matEff, notesMatiere);
 
