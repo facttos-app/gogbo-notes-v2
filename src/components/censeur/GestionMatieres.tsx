@@ -116,9 +116,9 @@ export const GestionMatieres: React.FC = () => {
         <div className="space-y-1">
           <p className="font-bold">Coefficients dynamiques et calculs en temps réel :</p>
           <p className="text-emerald-800 leading-relaxed">
-            Les coefficients ne sont jamais figés en dur dans le code. En tant que Censeur, vous pouvez modifier
-            le coefficient d'une matière (ex: SVT de 2 à 3). Dès l'enregistrement, tous les points pondérés,
-            moyennes générales, appréciations, classements et bulletins scolaires sont automatiquement recalculés.
+            Aucun coefficient n'est défini au départ : chaque enseignant définit le coefficient de sa matière
+            classe par classe, dans son espace pédagogique. Tant qu'un coefficient n'est pas défini dans une classe,
+            la matière n'entre pas dans la moyenne générale de cette classe.
           </p>
         </div>
       </div>
@@ -251,7 +251,7 @@ export const GestionMatieres: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center text-slate-400 font-mono">
-                          {m.coefficient}
+                          {'par classe'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {isCenseur ? (
@@ -350,7 +350,7 @@ export const GestionMatieres: React.FC = () => {
                         </div>
                       ) : (
                         <span className="inline-block bg-slate-100 text-slate-900 px-3 py-1 rounded-full font-black text-sm">
-                          {m.coefficient}
+                          {'par classe'}
                         </span>
                       )}
                     </td>
