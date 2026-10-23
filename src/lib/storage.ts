@@ -150,211 +150,41 @@ const STORAGE_KEYS = {
   VERSION: 'gogbo_v2_version',
 };
 
+// Correspondance collections locales -> tables Supabase (colonnes autorisées = schéma SQL).
+// Source de vérité : Supabase. localStorage ne sert que de cache de lecture.
+const REMOTE_TABLES: Record<string, { table: string; cols: string[]; noDelete?: boolean }> = {
+  [STORAGE_KEYS.PROFILES]: { table: 'profiles', cols: [] }, // lecture seule côté navigateur
+  [STORAGE_KEYS.CLASSES]: { table: 'classes', cols: ['id', 'nom', 'niveau', 'serie', 'effectif_max', 'salle', 'statut', 'created_at'] },
+  [STORAGE_KEYS.MATIERES]: { table: 'matieres', cols: ['id', 'code', 'nom', 'coefficient', 'statut', 'is_langue_option', 'categorie', 'created_at'] },
+  [STORAGE_KEYS.ELEVES]: { table: 'eleves', cols: ['id', 'matricule', 'nom', 'prenom', 'sexe', 'date_naissance', 'lieu_naissance', 'classe_id', 'langue_vivante_2', 'nom_parent', 'contact_parent', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.INSCRIPTIONS]: { table: 'inscriptions_eleves', cols: ['id', 'eleve_id', 'classe_id', 'annee_scolaire', 'statut', 'date_inscription', 'redoublant', 'actif', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PERIODES]: { table: 'periodes', cols: ['id', 'annee_scolaire', 'code', 'nom', 'is_active', 'is_locked', 'date_debut', 'date_fin', 'created_at'] },
+  [STORAGE_KEYS.ANNEES_SCOLAIRES]: { table: 'annees_scolaires', cols: ['id', 'libelle', 'date_debut', 'date_fin', 'is_active', 'statut', 'created_at'] },
+  [STORAGE_KEYS.AFFECTATIONS]: { table: 'affectations', cols: ['id', 'profile_id', 'classe_id', 'matiere_id', 'annee_scolaire', 'heures_hebdo', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.NOTES]: { table: 'notes', cols: ['id', 'eleve_id', 'affectation_id', 'periode_id', 'annee_scolaire', 'valeur', 'type_evaluation', 'saisi_par', 'observation', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PRESENCES]: { table: 'presences', cols: ['id', 'annee_scolaire', 'classe_id', 'eleve_id', 'date', 'statut', 'motif', 'justifie', 'heure_retard', 'enregistre_par_id', 'enregistre_par_nom', 'date_saisie', 'periode_id', 'enseignant_id', 'enseignant_nom', 'matiere_id', 'matiere_nom', 'seance_id', 'heure_debut', 'heure_fin', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PRESENCES_ENSEIGNANTS]: { table: 'presences_enseignants', cols: ['id', 'annee_scolaire', 'date', 'enseignant_id', 'enseignant_nom', 'matieres_attribuees', 'statut', 'motif', 'heure_arrivee', 'enregistre_par_id', 'enregistre_par_nom', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PROFESSEURS_PRINCIPAUX]: { table: 'professeurs_principaux', cols: ['id', 'profile_id', 'classe_id', 'annee_scolaire', 'statut', 'date_nomination', 'date_fin', 'motif_fin', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PAIEMENTS]: { table: 'paiements_contributions', cols: ['id', 'numero_recu', 'annee_scolaire', 'eleve_id', 'classe_id', 'tranche', 'contribution_id', 'contribution_libelle', 'categorie_contribution', 'montant_paye', 'montant_total_exige', 'reste_a_payer', 'statut_paiement', 'mode_paiement', 'reference_recu', 'observation', 'enregistre_par_id', 'enregistre_par_nom', 'date_paiement', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.CONTRIBUTIONS]: { table: 'contributions', cols: ['id', 'libelle', 'categorie', 'annee_scolaire', 'montant_prevu', 'public_cible', 'classe_id', 'observation', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.DEPENSES]: { table: 'depenses_budgetaires', cols: ['id', 'annee_scolaire', 'libelle', 'categorie', 'montant_alloue', 'montant_depense', 'date_depense', 'beneficiaire', 'piece_justificative', 'observation', 'enregistre_par_id', 'enregistre_par_nom', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PARENTS]: { table: 'parents', cols: ['id', 'profile_id', 'nom', 'prenom', 'telephone', 'email', 'profession', 'adresse', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PARENT_ELEVES]: { table: 'parent_eleves', cols: ['id', 'parent_id', 'eleve_id', 'lien_parental', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES]: { table: 'incidents_disciplinaires', cols: ['id', 'annee_scolaire', 'date', 'eleve_id', 'classe_id', 'type_incident', 'description', 'mesure_prise', 'observation', 'signale_par_id', 'signale_par_nom', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PUNITIONS]: { table: 'punitions_scolaires', cols: ['id', 'annee_scolaire', 'classe_id', 'eleve_id', 'date', 'heure', 'categorie_faute', 'faute_motif', 'punition_appliquee', 'duree_modalite', 'observation', 'auteur_id', 'auteur_nom', 'auteur_role', 'statut', 'annule_par_id', 'annule_par_nom', 'annule_le', 'motif_annulation', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES]: { table: 'sanctions_disciplinaires', cols: ['id', 'annee_scolaire', 'classe_id', 'eleve_id', 'date_decision', 'nature_decision', 'motif', 'autorite_decision', 'procedure_reference', 'duree_jours', 'date_debut', 'date_fin', 'observation', 'notification_parents', 'piece_jointe_ref', 'statut', 'enregistre_par_id', 'enregistre_par_nom', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.NOTES_CONDUITE]: { table: 'notes_conduite', cols: ['id', 'annee_scolaire', 'periode_id', 'classe_id', 'eleve_id', 'note', 'appreciation', 'saisi_par_id', 'saisi_par_nom', 'date_saisie', 'historique', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.SEANCES_COURS]: { table: 'seances_cours', cols: ['id', 'annee_scolaire', 'affectation_id', 'classe_id', 'matiere_id', 'enseignant_id', 'enseignant_nom', 'jour', 'heure_debut', 'heure_fin', 'salle', 'statut', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.NOTIFICATIONS_PARENTS]: { table: 'parent_notifications', cols: ['id', 'parent_id', 'eleve_id', 'annee_scolaire', 'titre', 'message', 'type', 'date_envoi', 'lu', 'created_at'] },
+  [STORAGE_KEYS.AUDIT_LOGS]: { table: 'audit_logs', cols: ['id', 'user_id', 'user_nom', 'user_role', 'action', 'table_cible', 'record_id', 'details', 'created_at'], noDelete: true },
+};
+
 // Profils Institutionnels Officiels de Base (Direction & Administration)
 // AUCUN enseignant fictif n'est pré-enregistré : le Censeur et le Concepteur renseignent eux-mêmes les vrais enseignants.
-const SEED_PROFILES: UserProfile[] = [
-  {
-    id: 'usr-concepteur',
-    email: 'concepteur@ceggogbo.bj',
-    nom: 'TOGNISSE',
-    prenom: 'Lumière',
-    role: 'CONCEPTEUR',
-    is_enseignant: false,
-    telephone: '+229 97 00 00 01',
-    adresse: 'Adjohoun - Direction Technique',
-    matiere: '',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-censeur',
-    email: 'censeur@ceggogbo.bj',
-    nom: 'DOSSOU-YOVO',
-    prenom: 'Clément',
-    role: 'CENSEUR',
-    is_enseignant: false,
-    telephone: '+229 97 12 34 56',
-    adresse: 'Adjohoun - Centre',
-    matiere: 'SVT',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-dg',
-    email: 'dg@ceggogbo.bj',
-    nom: 'KOUDERIN',
-    prenom: 'Mathias',
-    role: 'DIRECTEUR_GENERAL',
-    is_enseignant: false,
-    telephone: '+229 97 88 99 00',
-    adresse: 'Porto-Novo - Ouando',
-    matiere: 'Mathématiques',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-sg',
-    email: 'sg@ceggogbo.bj',
-    nom: 'HOUNSOU',
-    prenom: 'Patrice',
-    role: 'SURVEILLANT_GENERAL',
-    is_enseignant: false,
-    telephone: '+229 95 11 22 33',
-    adresse: 'Gangban - CEG GOGBO',
-    matiere: '',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-comptable',
-    email: 'comptable@ceggogbo.bj',
-    nom: 'AGBOSSA',
-    prenom: 'Jeanne',
-    role: 'COMPTABLE',
-    is_enseignant: false,
-    telephone: '+229 96 44 55 66',
-    adresse: 'Adjohoun - Quartier Démè',
-    matiere: '',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-ens-aroua',
-    email: 'aroua@ceggogbo.bj',
-    nom: 'AROUA',
-    prenom: 'Barnabé',
-    role: 'ENSEIGNANT',
-    is_enseignant: true,
-    telephone: '+229 97 10 20 30',
-    adresse: 'Adjohoun - Quartier Gbada',
-    matiere: 'Histoire-Géographie',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'usr-ens-kponou',
-    email: 'kponou@ceggogbo.bj',
-    nom: 'KPONOU',
-    prenom: 'Marcel',
-    role: 'ENSEIGNANT',
-    is_enseignant: true,
-    telephone: '+229 97 11 22 44',
-    adresse: 'Adjohoun - Centre',
-    matiere: 'PCT',
-    statut: 'ACTIF',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-01T08:00:00Z',
-  },
-];
+const SEED_PROFILES: UserProfile[] = []; // Données de démonstration supprimées : la source de vérité est Supabase.
 
 // Attributions officielles de cours : Censeur (SVT en 4eA & 3eB) et DG (Mathématiques en Terminale D)
-const SEED_AFFECTATIONS: AffectationPedagogique[] = [
-  {
-    id: 'aff-aroua-hist-6a',
-    profile_id: 'usr-ens-aroua',
-    classe_id: 'cls-6a',
-    matiere_id: 'mat-hist',
-    heures_hebdo: 2,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-kponou-pct-4a',
-    profile_id: 'usr-ens-kponou',
-    classe_id: 'cls-4a',
-    matiere_id: 'mat-pct',
-    heures_hebdo: 3,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-censeur-svt-4a',
-    profile_id: 'usr-censeur',
-    classe_id: 'cls-4a',
-    matiere_id: 'mat-svt',
-    heures_hebdo: 4,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-censeur-svt-3b',
-    profile_id: 'usr-censeur',
-    classe_id: 'cls-3b',
-    matiere_id: 'mat-svt',
-    heures_hebdo: 4,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-dg-math-td',
-    profile_id: 'usr-dg',
-    classe_id: 'cls-td',
-    matiere_id: 'mat-math',
-    heures_hebdo: 6,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-prof-maths-6a',
-    profile_id: 'usr-prof-maths',
-    classe_id: 'cls-6a',
-    matiere_id: 'mat-math',
-    heures_hebdo: 4,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-prof-francais-comm-6a',
-    profile_id: 'usr-prof-francais',
-    classe_id: 'cls-6a',
-    matiere_id: 'mat-comm',
-    heures_hebdo: 3,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-prof-francais-lect-6a',
-    profile_id: 'usr-prof-francais',
-    classe_id: 'cls-6a',
-    matiere_id: 'mat-lect',
-    heures_hebdo: 3,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'aff-prof-svt-6a',
-    profile_id: 'usr-prof-svt',
-    classe_id: 'cls-6a',
-    matiere_id: 'mat-svt',
-    heures_hebdo: 2,
-    annee_scolaire: '2026–2027',
-    statut: 'ACTIF',
-    created_at: '2026-09-05T09:00:00Z',
-    updated_at: '2026-09-05T09:00:00Z',
-  },
-];
+const SEED_AFFECTATIONS: AffectationPedagogique[] = []; // Données de démonstration supprimées : la source de vérité est Supabase.
 
 // AUCUN élève fictif : les vrais apprenants sont inscrits par le Censeur ou le Concepteur.
 const SEED_ELEVES: Eleve[] = [];
@@ -384,40 +214,7 @@ const SEED_SANCTIONS: SanctionDisciplinaire[] = [];
 const SEED_SEANCES_COURS: SeanceCours[] = [];
 
 // Seed Audit Logs
-const SEED_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: 'log-01',
-    user_id: 'usr-censeur',
-    user_nom: 'DOSSOU-YOVO Clément',
-    user_role: 'CENSEUR',
-    action: 'INITIALISATION_SYSTEME',
-    table_cible: 'parametres_ecole',
-    details: 'Initialisation officielle de la plateforme GOGBO NOTES V2 (Année 2026–2027)',
-    created_at: '2026-09-01T08:00:00Z',
-  },
-  {
-    id: 'log-02',
-    user_id: 'usr-censeur',
-    user_nom: 'DOSSOU-YOVO Clément',
-    user_role: 'CENSEUR',
-    action: 'CREATION_AFFECTATION',
-    table_cible: 'affectations',
-    record_id: 'aff-censeur-svt-4a',
-    details: 'Affectation pédagogique Censeur -> 4ème A (SVT, 4h/semaine)',
-    created_at: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'log-03',
-    user_id: 'usr-censeur',
-    user_nom: 'DOSSOU-YOVO Clément',
-    user_role: 'CENSEUR',
-    action: 'SAISIE_NOTE',
-    table_cible: 'notes',
-    record_id: 'not-01',
-    details: 'Saisie de note SVT Devoir 1 pour élève AGOSSOU Darius (Note: 14.5/20)',
-    created_at: '2026-10-15T14:30:00Z',
-  },
-];
+const SEED_AUDIT_LOGS: AuditLog[] = []; // Données de démonstration supprimées : la source de vérité est Supabase.
 
 class StorageEngine {
   private memoryStore: Record<string, string> = {};
@@ -468,9 +265,93 @@ class StorageEngine {
 
   private setItem<T>(key: string, value: T): void {
     try {
+      const prevRaw = this.rawGet(key);
       this.rawSet(key, JSON.stringify(value));
+      this.pushDiff(key, prevRaw, value);
     } catch (e) {
       console.warn('Storage setItem error:', e);
+    }
+  }
+
+  /** Ne garde que les colonnes qui existent dans la table Supabase. */
+  private pickColumns(row: Record<string, unknown>, cols: string[]): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const c of cols) {
+      if (row[c] !== undefined) out[c] = row[c];
+    }
+    return out;
+  }
+
+  private reportSyncError(table: string, message: string): void {
+    console.error(`Erreur synchronisation Supabase (${table}):`, message);
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gogbo-sync-error', { detail: { table, message } }));
+      }
+    } catch {
+      // ignoré
+    }
+  }
+
+  /**
+   * Écriture vers la base centrale : envoie uniquement les lignes nouvelles ou modifiées (upsert).
+   * Suppressions : limitées à 3 lignes par opération pour éviter toute suppression massive.
+   */
+  private pushDiff(key: string, prevRaw: string | null, value: unknown): void {
+    const spec = REMOTE_TABLES[key];
+    if (!spec || spec.cols.length === 0) return;
+    if (!checkIsSupabaseConfigured()) return;
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    let prev: unknown = null;
+    try {
+      prev = prevRaw ? JSON.parse(prevRaw) : null;
+    } catch {
+      prev = null;
+    }
+    const nextList = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
+    const prevList = Array.isArray(prev) ? (prev as Record<string, unknown>[]) : [];
+    const prevMap = new Map<string, string>();
+    for (const r of prevList) {
+      if (r && r.id != null) prevMap.set(String(r.id), JSON.stringify(r));
+    }
+    const changed = nextList
+      .filter((r) => r && r.id != null && prevMap.get(String(r.id)) !== JSON.stringify(r))
+      .map((r) => this.pickColumns(r, spec.cols));
+    const nextIds = new Set(nextList.filter((r) => r && r.id != null).map((r) => String(r.id)));
+    const removed = spec.noDelete
+      ? []
+      : prevList.filter((r) => r && r.id != null && !nextIds.has(String(r.id))).map((r) => String(r.id));
+    if (changed.length === 0 && removed.length === 0) return;
+
+    void (async () => {
+      try {
+        const { data: sess } = await client.auth.getSession();
+        if (!sess?.session) return;
+        for (let i = 0; i < changed.length; i += 200) {
+          const chunk = changed.slice(i, i + 200);
+          const { error } = await client.from(spec.table).upsert(chunk, { onConflict: 'id' });
+          if (error) this.reportSyncError(spec.table, error.message);
+        }
+        if (removed.length > 0) {
+          if (removed.length <= 3) {
+            const { error } = await client.from(spec.table).delete().in('id', removed);
+            if (error) this.reportSyncError(spec.table, error.message);
+          } else {
+            console.warn(`Suppression distante ignorée (${removed.length} lignes) pour ${spec.table} : protection anti-suppression massive.`);
+          }
+        }
+      } catch (err) {
+        this.reportSyncError(spec.table, err instanceof Error ? err.message : String(err));
+      }
+    })();
+  }
+
+  /** Efface le cache local (appareil partagé) : les données réelles restent dans Supabase. */
+  public clearLocalCache(): void {
+    for (const key of Object.keys(REMOTE_TABLES)) {
+      this.rawRemove(key);
     }
   }
 
@@ -480,6 +361,12 @@ class StorageEngine {
 
   public init(): void {
     try {
+      // Mode production : la base Supabase est la seule source de vérité.
+      // Aucune donnée locale, aucun compte ni élève de démonstration n'est créé.
+      if (checkIsSupabaseConfigured()) {
+        void this.syncFromSupabase();
+        return;
+      }
       const initialized = this.rawGet(STORAGE_KEYS.VERSION);
       if (!initialized) {
         this.setItem(STORAGE_KEYS.PROFILES, SEED_PROFILES);
@@ -828,173 +715,34 @@ class StorageEngine {
     if (!client) {
       return { ok: false, count: 0, error: 'Client Supabase indisponible' };
     }
-
     try {
+      const { data: sess } = await client.auth.getSession();
+      if (!sess?.session) {
+        return { ok: false, count: 0, error: 'Aucune session authentifiée' };
+      }
       let itemsCount = 0;
-
-      // 1. Profils scolaires réels
-      const { data: remoteProfiles, error: errProf } = await client.from('profiles').select('*');
-      if (!errProf && remoteProfiles && remoteProfiles.length > 0) {
-        // Fusion non-destructive pour préserver les comptes administratifs et locaux
-        const currentProfiles = this.getItem<UserProfile[]>(STORAGE_KEYS.PROFILES, SEED_PROFILES);
-        const mergedProfiles = [...remoteProfiles];
-        for (const localP of currentProfiles) {
-          if (!mergedProfiles.some((rp) => rp.id === localP.id || (rp.email && localP.email && rp.email.toLowerCase() === localP.email.toLowerCase()))) {
-            mergedProfiles.push(localP);
-          }
+      const errors: string[] = [];
+      for (const [key, spec] of Object.entries(REMOTE_TABLES)) {
+        let query = client.from(spec.table).select('*');
+        if (spec.table === 'audit_logs') {
+          query = query.order('created_at', { ascending: false }).limit(200);
         }
-        this.setItem(STORAGE_KEYS.PROFILES, mergedProfiles);
-        itemsCount += remoteProfiles.length;
+        const { data, error } = await query;
+        if (error) {
+          errors.push(`${spec.table}: ${error.message}`);
+          continue;
+        }
+        const rows = data ?? [];
+        // rawSet : le cache local est remplacé par l'état réel de la base, sans réécriture vers Supabase
+        this.rawSet(key, JSON.stringify(rows));
+        itemsCount += rows.length;
       }
-
-      // 2. Classes de l'établissement
-      const { data: remoteClasses, error: errCls } = await client.from('classes').select('*');
-      if (!errCls && remoteClasses && remoteClasses.length > 0) {
-        this.setItem(STORAGE_KEYS.CLASSES, remoteClasses);
-        itemsCount += remoteClasses.length;
-      }
-
-      // 3. Matières
-      const { data: remoteMatieres, error: errMat } = await client.from('matieres').select('*');
-      if (!errMat && remoteMatieres && remoteMatieres.length > 0) {
-        this.setItem(STORAGE_KEYS.MATIERES, remoteMatieres);
-        itemsCount += remoteMatieres.length;
-      }
-
-      // 4. Élèves
-      const { data: remoteEleves, error: errElv } = await client.from('eleves').select('*');
-      if (!errElv && remoteEleves && remoteEleves.length > 0) {
-        this.setItem(STORAGE_KEYS.ELEVES, remoteEleves);
-        itemsCount += remoteEleves.length;
-      }
-
-      // 5. Inscriptions annuelles
-      const { data: remoteInscs, error: errInsc } = await client.from('inscriptions_eleves').select('*');
-      if (!errInsc && remoteInscs && remoteInscs.length > 0) {
-        this.setItem(STORAGE_KEYS.INSCRIPTIONS, remoteInscs);
-        itemsCount += remoteInscs.length;
-      }
-
-      // 6. Affectations pédagogiques
-      const { data: remoteAffs, error: errAff } = await client.from('affectations').select('*');
-      if (!errAff && remoteAffs && remoteAffs.length > 0) {
-        this.setItem(STORAGE_KEYS.AFFECTATIONS, remoteAffs);
-        itemsCount += remoteAffs.length;
-      }
-
-      // 7. Notes
-      const { data: remoteNotes, error: errNotes } = await client.from('notes').select('*');
-      if (!errNotes && remoteNotes && remoteNotes.length > 0) {
-        this.setItem(STORAGE_KEYS.NOTES, remoteNotes);
-        itemsCount += remoteNotes.length;
-      }
-
-      // 8. Périodes scolaires
-      const { data: remotePeriodes, error: errPer } = await client.from('periodes').select('*');
-      if (!errPer && remotePeriodes && remotePeriodes.length > 0) {
-        this.setItem(STORAGE_KEYS.PERIODES, remotePeriodes);
-        itemsCount += remotePeriodes.length;
-      }
-
-      // 9. Années scolaires
-      const { data: remoteAnnees, error: errAnn } = await client.from('annees_scolaires').select('*');
-      if (!errAnn && remoteAnnees && remoteAnnees.length > 0) {
-        this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, remoteAnnees);
-        itemsCount += remoteAnnees.length;
-      }
-
-      // 10. Paramètres école
-      const { data: remoteParams, error: errParams } = await client.from('parametres_ecole').select('*').maybeSingle();
-      if (!errParams && remoteParams) {
-        this.setItem(STORAGE_KEYS.PARAMETRES, remoteParams);
-        itemsCount += 1;
-      }
-
-      // 11. Présences enseignants
-      const { data: remotePresEns, error: errPresEns } = await client.from('presences_enseignants').select('*');
-      if (!errPresEns && remotePresEns && remotePresEns.length > 0) {
-        this.setItem(STORAGE_KEYS.PRESENCES_ENSEIGNANTS, remotePresEns);
-        itemsCount += remotePresEns.length;
-      }
-
-      // 12. Professeurs principaux
-      const { data: remotePP, error: errPP } = await client.from('professeurs_principaux').select('*');
-      if (!errPP && remotePP && remotePP.length > 0) {
-        this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, remotePP);
-        itemsCount += remotePP.length;
-      }
-
-      // 13. Présences quotidiennes apprenants
       try {
-        const { data: remotePres, error: errPres } = await client.from('presences').select('*');
-        if (!errPres && remotePres && remotePres.length > 0) {
-          this.setItem(STORAGE_KEYS.PRESENCES, remotePres);
-          itemsCount += remotePres.length;
-        }
-      } catch {}
-
-      // 14. Notes de conduite
-      try {
-        const { data: remoteCond, error: errCond } = await client.from('notes_conduite').select('*');
-        if (!errCond && remoteCond && remoteCond.length > 0) {
-          this.setItem(STORAGE_KEYS.NOTES_CONDUITE, remoteCond);
-          itemsCount += remoteCond.length;
-        }
-      } catch {}
-
-      // 15. Punitions et sanctions disciplinaires
-      try {
-        const { data: remotePun, error: errPun } = await client.from('punitions_scolaires').select('*');
-        if (!errPun && remotePun && remotePun.length > 0) {
-          this.setItem(STORAGE_KEYS.PUNITIONS, remotePun);
-          itemsCount += remotePun.length;
-        }
-        const { data: remoteSanc, error: errSanc } = await client.from('sanctions_disciplinaires').select('*');
-        if (!errSanc && remoteSanc && remoteSanc.length > 0) {
-          this.setItem(STORAGE_KEYS.SANCTIONS_DISCIPLINAIRES, remoteSanc);
-          itemsCount += remoteSanc.length;
-        }
-        const { data: remoteInc, error: errInc } = await client.from('incidents_disciplinaires').select('*');
-        if (!errInc && remoteInc && remoteInc.length > 0) {
-          this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, remoteInc);
-          itemsCount += remoteInc.length;
-        }
-      } catch {}
-
-      // 16. Finances & Contributions scolaires
-      try {
-        const { data: remoteContr, error: errContr } = await client.from('contributions').select('*');
-        if (!errContr && remoteContr && remoteContr.length > 0) {
-          this.setItem(STORAGE_KEYS.CONTRIBUTIONS, remoteContr);
-          itemsCount += remoteContr.length;
-        }
-        const { data: remotePaie, error: errPaie } = await client.from('paiements_contributions').select('*');
-        if (!errPaie && remotePaie && remotePaie.length > 0) {
-          this.setItem(STORAGE_KEYS.PAIEMENTS, remotePaie);
-          itemsCount += remotePaie.length;
-        }
-        const { data: remoteDep, error: errDep } = await client.from('depenses_budgetaires').select('*');
-        if (!errDep && remoteDep && remoteDep.length > 0) {
-          this.setItem(STORAGE_KEYS.DEPENSES, remoteDep);
-          itemsCount += remoteDep.length;
-        }
-      } catch {}
-
-      // 17. Parents d'élèves
-      try {
-        const { data: remoteParents, error: errParents } = await client.from('parents').select('*');
-        if (!errParents && remoteParents && remoteParents.length > 0) {
-          this.setItem(STORAGE_KEYS.PARENTS, remoteParents);
-          itemsCount += remoteParents.length;
-        }
-        const { data: remotePE, error: errPE } = await client.from('parent_eleves').select('*');
-        if (!errPE && remotePE && remotePE.length > 0) {
-          this.setItem(STORAGE_KEYS.PARENT_ELEVES, remotePE);
-          itemsCount += remotePE.length;
-        }
-      } catch {}
-
-      return { ok: true, count: itemsCount };
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('gogbo-data-synced'));
+      } catch {
+        // ignoré
+      }
+      return { ok: errors.length === 0, count: itemsCount, error: errors.length ? errors.join(' | ') : undefined };
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn('Erreur lors de syncFromSupabase:', errMsg);
@@ -4973,176 +4721,4 @@ class StorageEngine {
     id: string,
     operator: UserProfile,
     motif?: string
-  ): Promise<ProfesseurPrincipal> {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de retirer un Professeur Principal.");
-    }
-
-    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
-    const idx = list.findIndex((p) => p.id === id);
-    if (idx === -1) throw new Error("Attribution de Professeur Principal introuvable.");
-
-    const current = list[idx];
-    const teacher = this.getProfileById(current.profile_id);
-    const classe = this.getClasseById(current.classe_id);
-    const now = new Date().toISOString();
-
-    const updated: ProfesseurPrincipal = {
-      ...current,
-      statut: 'CLOTURE',
-      date_fin: now.split('T')[0],
-      motif_fin: motif || 'Retrait par décision du Censeur',
-      updated_at: now,
-    };
-
-    list[idx] = updated;
-    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
-
-    this.addAuditLog({
-      user_id: operator.id,
-      user_nom: `${operator.nom} ${operator.prenom}`,
-      user_role: operator.role,
-      action: 'RETRAIT_PROFESSEUR_PRINCIPAL',
-      table_cible: 'professeurs_principaux',
-      record_id: id,
-      details: `Retrait PP (${current.annee_scolaire}) : Fin de fonction PP pour ${teacher?.nom} ${teacher?.prenom} en ${classe?.nom}${motif ? ` (Motif : ${motif})` : ''}`,
-    });
-
-    const supabase = getSupabaseClient();
-    if (supabase && isSupabaseConfigured) {
-      try {
-        await supabase.from('professeurs_principaux').update({
-          statut: 'CLOTURE',
-          date_fin: updated.date_fin,
-          motif_fin: updated.motif_fin,
-          updated_at: updated.updated_at,
-        }).eq('id', id);
-      } catch (err) {
-        console.warn('Sync Supabase update PP failed:', err);
-      }
-    }
-
-    return updated;
-  }
-
-  public async deleteProfesseurPrincipal(id: string, operator: UserProfile): Promise<boolean> {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur peut supprimer un enregistrement.");
-    }
-
-    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
-    const item = list.find((p) => p.id === id);
-    if (!item) return false;
-
-    const teacher = this.getProfileById(item.profile_id);
-    const classe = this.getClasseById(item.classe_id);
-
-    const updated = list.filter((p) => p.id !== id);
-    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, updated);
-
-    this.addAuditLog({
-      user_id: operator.id,
-      user_nom: `${operator.nom} ${operator.prenom}`,
-      user_role: operator.role,
-      action: 'SUPPRESSION_PROFESSEUR_PRINCIPAL',
-      table_cible: 'professeurs_principaux',
-      record_id: id,
-      details: `Suppression enregistrement PP : ${teacher?.nom} ${teacher?.prenom} (${classe?.nom} - ${item.annee_scolaire})`,
-    });
-
-    const supabase = getSupabaseClient();
-    if (supabase && isSupabaseConfigured) {
-      try {
-        await supabase.from('professeurs_principaux').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Sync Supabase delete PP failed:', err);
-      }
-    }
-
-    return true;
-  }
-
-  // --- UTILITAIRES / EXPORT / RESET ---
-  public resetToDefaults(): void {
-    this.rawRemove(STORAGE_KEYS.VERSION);
-    this.init();
-  }
-
-  public exportDatabaseJSON(): string {
-    const data = {
-      parametres: this.getParametres(),
-      annees_scolaires: this.getAnneesScolaires(),
-      profiles: this.getProfiles(),
-      classes: this.getClasses(),
-      matieres: this.getMatieres(),
-      coefficients_classes: this.getCoefficientsClasses(),
-      eleves: this.getEleves(),
-      inscriptions: this.getInscriptions(),
-      periodes: this.getPeriodes(),
-      affectations: this.getAffectations(),
-      notes: this.getNotes(),
-      presences: this.getPresences(),
-      presences_enseignants: this.getPresencesEnseignants(),
-      professeurs_principaux: this.getProfesseursPrincipaux(),
-      paiements: this.getPaiements(),
-      contributions: this.getContributions(),
-      depenses: this.getDepenses(),
-      parents: this.getParents(),
-      parent_eleves: this.getParentEleves(),
-      incidents_disciplinaires: this.getIncidentsDisciplinaires(),
-      notifications_parents: this.getNotificationsParents(),
-      audit_logs: this.getAuditLogs(),
-      exported_at: new Date().toISOString(),
-      version: '2.5.0',
-    };
-    return JSON.stringify(data, null, 2);
-  }
-
-  public importDatabaseJSON(jsonStr: string, operator: UserProfile): void {
-    try {
-      const data = JSON.parse(jsonStr);
-      if (data.profiles && data.classes && data.eleves) {
-        if (data.parametres) this.setItem(STORAGE_KEYS.PARAMETRES, data.parametres);
-        if (data.annees_scolaires) this.setItem(STORAGE_KEYS.ANNEES_SCOLAIRES, data.annees_scolaires);
-        this.setItem(STORAGE_KEYS.PROFILES, data.profiles);
-        this.setItem(STORAGE_KEYS.CLASSES, data.classes);
-        this.setItem(STORAGE_KEYS.MATIERES, data.matieres);
-        if (data.coefficients_classes) this.setItem(STORAGE_KEYS.COEFFICIENTS_CLASSES, data.coefficients_classes);
-        this.setItem(STORAGE_KEYS.ELEVES, data.eleves);
-        if (data.inscriptions) this.setItem(STORAGE_KEYS.INSCRIPTIONS, data.inscriptions);
-        this.setItem(STORAGE_KEYS.PERIODES, data.periodes);
-        this.setItem(STORAGE_KEYS.AFFECTATIONS, data.affectations);
-        this.setItem(STORAGE_KEYS.NOTES, data.notes);
-        if (data.presences) this.setItem(STORAGE_KEYS.PRESENCES, data.presences);
-        if (data.presences_enseignants) this.setItem(STORAGE_KEYS.PRESENCES_ENSEIGNANTS, data.presences_enseignants);
-        if (data.professeurs_principaux) this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, data.professeurs_principaux);
-        if (data.paiements) this.setItem(STORAGE_KEYS.PAIEMENTS, data.paiements);
-        if (data.contributions) this.setItem(STORAGE_KEYS.CONTRIBUTIONS, data.contributions);
-        if (data.depenses) this.setItem(STORAGE_KEYS.DEPENSES, data.depenses);
-        if (data.parents) this.setItem(STORAGE_KEYS.PARENTS, data.parents);
-        if (data.parent_eleves) this.setItem(STORAGE_KEYS.PARENT_ELEVES, data.parent_eleves);
-        if (data.incidents_disciplinaires) this.setItem(STORAGE_KEYS.INCIDENTS_DISCIPLINAIRES, data.incidents_disciplinaires);
-        if (data.notifications_parents) this.setItem(STORAGE_KEYS.NOTIFICATIONS_PARENTS, data.notifications_parents);
-        this.setItem(STORAGE_KEYS.AUDIT_LOGS, data.audit_logs || []);
-
-        this.addAuditLog({
-          user_id: operator.id,
-          user_nom: `${operator.nom} ${operator.prenom}`,
-          user_role: operator.role,
-          action: 'IMPORT_BASE_DONNEES',
-          table_cible: 'system',
-          details: 'Restauration complète de la base de données depuis une archive JSON',
-        });
-      }
-    } catch (e) {
-      throw new Error(`Erreur lors de l'import: ${e instanceof Error ? e.message : 'Fichier JSON invalide'}`);
-    }
-  }
-}
-
-export const storage = new StorageEngine();
-try {
-  storage.init();
-} catch (e) {
-  console.warn('Storage initial bootstrap notice:', e);
-}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
