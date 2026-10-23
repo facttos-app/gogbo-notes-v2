@@ -60,16 +60,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    try {
-      storage.init();
-      // Conserver la session existante si connectée
-      const storedId = storage.getCurrentUserId();
-      loadUserData(storedId);
-    } catch (e) {
-      console.warn('AuthContext init notice:', e);
-    } finally {
-      setIsLoading(false);
-    }
+    let cancelled = false;
+    const boot = async () => {
+      try {
+        storage.init();
+        if (checkIsSupabaseConfigured()) {
+          // La session est restaurée uniquement depuis Supabase Auth ; aucune session locale n'est crue.
+          const supabase = getSupabaseClient();
+          const res = supabase ? await supabase.auth.getSession() : null;
+          const uid = res?.data?.session?.user?.id ?? null;
+          if (uid) {
+            await storage.syncFromSupabase();
+            if (!cancelled) {
+              storage.setCurrentUserId(uid);
+              loadUserData(uid);
+            }
+          } else {
+            storage.clearCurrentUser();
+          }
+        } else {
+          storage.clearCurrentUser();
+        }
+      } catch (e) {
+        console.warn('AuthContext init notice:', e);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (
@@ -113,27 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
 
-          // Secours d'urgence si Supabase est temporairement indisponible ou réseau défaillant
           if (isNetworkFailure) {
-            const localProfiles = storage.getProfiles();
-            const emergencyUser = localProfiles.find(
-              (p) => (p.email && p.email.toLowerCase() === cleanInput) || p.id === cleanInput
-            );
-            if (emergencyUser && storage.verifyUserPassword(emergencyUser.id, cleanPass)) {
-              if (emergencyUser.statut !== 'ACTIF') {
-                setIsLoading(false);
-                return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
-              }
-              storage.setCurrentUserId(emergencyUser.id);
-              loadUserData(emergencyUser.id);
-              setIsLoading(false);
-              return { success: true };
-            }
-
             setIsLoading(false);
             return {
               success: false,
-              error: `Serveur Supabase momentanément inaccessible (${netErrorMessage || 'problème réseau'}). Le portail d'authentification reste disponible ; réessayez dans quelques instants ou vérifiez votre accès internet.`,
+              error: `Serveur inaccessible (${netErrorMessage || 'problème réseau'}). Vérifiez votre connexion internet puis réessayez dans quelques instants.`,
             };
           }
 
@@ -141,26 +146,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(false);
             const msg = authError.message.toLowerCase();
             if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
-              // Vérification alternative sur le stockage local si le compte a été configuré localement
-              const localProfiles = storage.getProfiles();
-              const localCandidate = localProfiles.find(
-                (p) => (p.email && p.email.toLowerCase() === cleanInput) || p.id === cleanInput
-              );
-              if (localCandidate && storage.verifyUserPassword(localCandidate.id, cleanPass)) {
-                storage.setCurrentUserId(localCandidate.id);
-                loadUserData(localCandidate.id);
-                return { success: true };
-              }
-
-              return { 
-                success: false, 
-                error: "Identifiant ou mot de passe incorrect sur Supabase. Si votre compte Censeur n'a pas encore été synchronisé sur cette base centrale, utilisez « Mot de passe oublié / Réinitialisation sécurisée » avec le code d'établissement GOGBO2026." 
+              return {
+                success: false,
+                error: 'Identifiant ou mot de passe incorrect. En cas d’oubli, contactez l’administration de l’établissement.',
               };
             }
             if (msg.includes('email not confirmed')) {
               return { 
                 success: false, 
-                error: "Cette adresse e-mail n'a pas encore été confirmée sur le serveur Supabase. Veuillez valider le lien de confirmation reçu par e-mail ou désactiver l'option 'Confirm email' dans les paramètres Auth de votre projet Supabase." 
+                error: "Ce compte n'est pas encore activé. Contactez l'administration de l'établissement." 
               };
             }
             return { 
@@ -184,41 +178,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn('Erreur lecture profil par id:', err);
             }
 
-            // Recherche par e-mail si non trouvé par ID
-            if (!profileRow) {
-              try {
-                const { data: pByEmail } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .ilike('email', cleanInput)
-                  .maybeSingle();
-                if (pByEmail) {
-                  profileRow = pByEmail as UserProfile;
-                  if (profileRow.id !== authData.user.id) {
-                    profileRow = { ...profileRow, id: authData.user.id };
-                    try {
-                      await supabase.from('profiles').update({ id: authData.user.id }).eq('email', cleanInput);
-                    } catch {}
-                  }
-                }
-              } catch (err) {
-                console.warn('Erreur lecture profil par email:', err);
-              }
-            }
-
-            // Rattachement légitime au profil scolaire réel correspondant à l'adresse e-mail
-            if (!profileRow) {
-              const localCandidate = storage.getProfiles().find((p) => p.email && p.email.toLowerCase() === cleanInput);
-              if (localCandidate) {
-                profileRow = { ...localCandidate, id: authData.user.id };
-                try {
-                  await supabase.from('profiles').upsert(profileRow);
-                } catch (insCatch) {
-                  console.warn('Notice synchronisation profil vers base centrale:', insCatch);
-                }
-              }
-            }
-
             const profile: UserProfile | null = profileRow;
             if (!profile) {
               setIsLoading(false);
@@ -232,6 +191,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setIsLoading(false);
               return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
             }
+
+            // Chargement des données réelles depuis la base centrale avant les contrôles d'accès
+            await storage.syncFromSupabase();
 
             // Contrôle de séparation des portails
             if (portalTarget === 'ADMIN') {
@@ -294,168 +256,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Mode local de transition ou autonome (quand Supabase n'est pas encore configuré)
-      const profiles = storage.getProfiles();
-      let user = profiles.find((p) => p.email && p.email.toLowerCase() === cleanInput);
-      if (!user && (cleanInput === 'censeur@gmail.com' || cleanInput === 'censeur@ceggogbo.bj')) {
-        user = storage.getProfileById('usr-censeur');
-      }
-      if (!user && cleanDigits.length >= 8) {
-        user = profiles.find((p) => p.telephone && p.telephone.replace(/[^0-9]/g, '').endsWith(cleanDigits));
-      }
-      if (!user) {
-        const parent = storage.getParentByPhoneOrEmail(cleanInput);
-        if (parent && parent.profile_id) {
-          user = storage.getProfileById(parent.profile_id);
-        }
-      }
-
-      // Contrôle de l'identifiant et du mot de passe en mode local
-      if (!user) {
-        setIsLoading(false);
-        return { success: false, error: 'Identifiant (e-mail ou téléphone) ou mot de passe incorrect.' };
-      }
-
-      const isPasswordValid = storage.verifyUserPassword(user.id, cleanPass);
-      if (!isPasswordValid) {
-        setIsLoading(false);
-        return { success: false, error: 'Identifiant ou mot de passe incorrect.' };
-      }
-
-      if (user.statut !== 'ACTIF') {
-        setIsLoading(false);
-        return { success: false, error: 'Ce compte a été désactivé par l’administration.' };
-      }
-
-      // Contrôle de séparation des portails
-      if (portalTarget === 'ADMIN') {
-        const adminRoles = ['DIRECTEUR_GENERAL', 'CENSEUR', 'CONCEPTEUR', 'SURVEILLANT_GENERAL', 'COMPTABLE'];
-        if (!adminRoles.includes(user.role)) {
-          setIsLoading(false);
-          return {
-            success: false,
-            error: "Accès refusé au Portail Administration : Ce compte ne possède pas d'habilitation administrative.",
-          };
-        }
-      } else if (portalTarget === 'ENSEIGNANT') {
-        const hasAffectations = storage.getAffectationsByProfile(user.id).length > 0;
-        const canTeach = user.is_enseignant || user.role === 'ENSEIGNANT' || hasAffectations;
-        if (!canTeach) {
-          setIsLoading(false);
-          return {
-            success: false,
-            error: "Accès refusé au Portail Enseignants : Ce compte n'exerce aucune fonction pédagogique active.",
-          };
-        }
-      } else if (portalTarget === 'PARENT') {
-        if (user.role !== 'PARENT') {
-          setIsLoading(false);
-          return {
-            success: false,
-            error: "Accès refusé à l'Espace Parents : Ce compte est un compte du personnel scolaire. Veuillez vous connecter via le Portail Administration ou Enseignants.",
-          };
-        }
-      }
-
-      if (user.role === 'PARENT' && portalTarget !== 'PARENT') {
-        setIsLoading(false);
+      // Mode local supprimé : la connexion exige la base centrale Supabase.
+      setIsLoading(false);
+      if (!isSupa) {
         return {
           success: false,
-          error: "Accès refusé : Ce compte est un compte Parent d'Élève. Veuillez utiliser l'« Espace Parents ».",
+          error: 'Configuration Supabase manquante sur ce déploiement (variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY). Contactez l’administrateur technique.',
         };
       }
-
-      storage.setCurrentUserId(user.id);
-      loadUserData(user.id);
-
-      storage.addAuditLog({
-        user_id: user.id,
-        user_nom: `${user.nom} ${user.prenom}`,
-        user_role: user.role,
-        action: 'CONNEXION_LOCAL',
-        table_cible: 'auth',
-        details: `Connexion locale (${portalTarget || 'STANDARD'}) : ${user.nom} ${user.prenom} (${user.role})`,
-      });
-
-      setIsLoading(false);
-      return { success: true };
+      return { success: false, error: 'Identifiant (adresse e-mail) ou mot de passe incorrect.' };
     } catch {
       setIsLoading(false);
       return { success: false, error: 'Une erreur est survenue lors de l’authentification.' };
     }
   };
 
-  const resetPassword = async (emailOrId: string, newPass: string): Promise<{ success: boolean; error?: string }> => {
-    const cleanEmail = emailOrId.trim().toLowerCase();
-    const cleanPass = newPass.trim();
-
-    if (checkIsSupabaseConfigured() && cleanEmail.includes('@')) {
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        try {
-          const isCenseur = cleanEmail === 'censeur@gmail.com' || cleanEmail === 'censeur@ceggogbo.bj' || cleanEmail.includes('censeur');
-
-          // 1. Tenter la création / premier enrôlement direct dans Supabase Auth
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-            email: cleanEmail,
-            password: cleanPass,
-            options: {
-              data: {
-                nom: isCenseur ? 'DOSSOU-YOVO' : 'Personnel',
-                prenom: isCenseur ? 'Clément' : 'CEG GOGBO',
-                role: isCenseur ? 'CENSEUR' : 'ENSEIGNANT',
-              },
-            },
-          });
-
-          if (signUpData?.user) {
-            const newProfile: UserProfile = {
-              id: signUpData.user.id,
-              email: cleanEmail,
-              nom: isCenseur ? 'DOSSOU-YOVO' : 'Personnel',
-              prenom: isCenseur ? 'Clément' : 'CEG GOGBO',
-              role: isCenseur ? 'CENSEUR' : 'ENSEIGNANT',
-              is_enseignant: !isCenseur,
-              telephone: isCenseur ? '+229 97 12 34 56' : '',
-              adresse: 'Adjohoun - Centre',
-              matiere: isCenseur ? 'SVT' : '',
-              statut: 'ACTIF',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            try {
-              await supabase.from('profiles').upsert(newProfile);
-            } catch (pInsErr) {
-              console.warn('Upsert profil suite initialisation Supabase Auth:', pInsErr);
-            }
-            storage.setUserPassword(newProfile.id, cleanPass);
-            storage.updateProfile(newProfile.id, newProfile, newProfile);
-            return { success: true };
-          }
-
-          // Si le compte existe déjà dans Supabase Auth
-          if (signUpErr && signUpErr.message.toLowerCase().includes('already registered')) {
-            const { error: resetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
-            if (resetErr) {
-              return { success: false, error: `Erreur Supabase réinitialisation : ${resetErr.message}` };
-            }
-            // Mettre à jour aussi le mot de passe local pour cohérence
-            storage.resetUserPassword(cleanEmail, cleanPass);
-            return { 
-              success: true, 
-              error: undefined 
-            };
-          }
-
-          if (signUpErr) {
-            return { success: false, error: `Erreur Supabase : ${signUpErr.message}` };
-          }
-        } catch (e: unknown) {
-          return { success: false, error: e instanceof Error ? e.message : 'Erreur réseau Supabase' };
-        }
-      }
-    }
-    return storage.resetUserPassword(emailOrId, newPass);
+  // Réinitialisation en libre-service désactivée : elle permettait de créer des comptes et des profils
+  // depuis le navigateur. Le mot de passe est réinitialisé par l'administration.
+  const resetPassword = async (_emailOrId: string, _newPass: string): Promise<{ success: boolean; error?: string }> => {
+    return {
+      success: false,
+      error: 'La réinitialisation en libre-service est désactivée. Contactez l’administration du CEG GOGBO pour réinitialiser votre mot de passe.',
+    };
   };
 
   const logout = () => {
@@ -469,13 +291,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         details: `Déconnexion de ${currentUser.nom} ${currentUser.prenom}`,
       });
     }
+    void getSupabaseClient()?.auth.signOut();
     storage.clearCurrentUser();
+    storage.clearLocalCache();
     setCurrentUser(null);
     setAffectations([]);
   };
 
   const updateMyEmail = async (newEmail: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: 'Aucun utilisateur connecté' };
+    if (checkIsSupabaseConfigured()) {
+      return { success: false, error: 'Le changement de l’identifiant de connexion est réservé à l’administration.' };
+    }
     const res = await storage.updateUserEmail(currentUser.id, newEmail);
     if (res.success) {
       loadUserData(currentUser.id);
@@ -485,7 +312,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateMyPassword = async (oldPass: string, newPass: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: 'Aucun utilisateur connecté' };
-    return storage.updateUserPassword(currentUser.id, oldPass, newPass);
+    const supabase = getSupabaseClient();
+    if (!checkIsSupabaseConfigured() || !supabase || !currentUser.email) {
+      return { success: false, error: 'Configuration Supabase manquante.' };
+    }
+    if (newPass.trim().length < 8) {
+      return { success: false, error: 'Le nouveau mot de passe doit contenir au moins 8 caractères.' };
+    }
+    const { error: reAuthError } = await supabase.auth.signInWithPassword({
+      email: currentUser.email,
+      password: oldPass.trim(),
+    });
+    if (reAuthError) return { success: false, error: 'Ancien mot de passe incorrect.' };
+    const { error: updError } = await supabase.auth.updateUser({ password: newPass.trim() });
+    if (updError) return { success: false, error: `Erreur : ${updError.message}` };
+    return { success: true };
   };
 
   const updateMyProfile = async (data: {
@@ -498,6 +339,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }): Promise<{ success: boolean; error?: string; profile?: UserProfile }> => {
     if (!currentUser) return { success: false, error: 'Aucun utilisateur connecté.' };
     const res = storage.updateMyProfile(currentUser.id, data, currentUser);
+    if (res.success && res.profile && checkIsSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        // L'e-mail de connexion et le rôle ne sont jamais modifiés depuis le navigateur.
+        const { error: pErr } = await supabase
+          .from('profiles')
+          .update({
+            nom: data.nom,
+            prenom: data.prenom,
+            adresse: data.adresse ?? null,
+            telephone: data.telephone ?? null,
+            matiere: data.matiere ?? null,
+          })
+          .eq('id', currentUser.id);
+        if (pErr) return { success: false, error: `Enregistrement impossible : ${pErr.message}` };
+      }
+    }
     if (res.success && res.profile) {
       setCurrentUser(res.profile);
       loadUserData(res.profile.id);
@@ -506,6 +364,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchUser = (profileId: string) => {
+    // Désactivé en production : on ne change jamais d'identité sans nouvelle authentification.
+    if (checkIsSupabaseConfigured()) return;
     storage.setCurrentUserId(profileId);
     loadUserData(profileId);
   };
