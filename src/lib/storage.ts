@@ -1,3 +1,4 @@
+import { setCoefficientResolver } from './appreciation';
 import { 
   UserProfile, 
   Classe, 
@@ -176,6 +177,7 @@ const REMOTE_TABLES: Record<string, { table: string; cols: string[]; noDelete?: 
   [STORAGE_KEYS.NOTES_CONDUITE]: { table: 'notes_conduite', cols: ['id', 'annee_scolaire', 'periode_id', 'classe_id', 'eleve_id', 'note', 'appreciation', 'saisi_par_id', 'saisi_par_nom', 'date_saisie', 'historique', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.SEANCES_COURS]: { table: 'seances_cours', cols: ['id', 'annee_scolaire', 'affectation_id', 'classe_id', 'matiere_id', 'enseignant_id', 'enseignant_nom', 'jour', 'heure_debut', 'heure_fin', 'salle', 'statut', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.NOTIFICATIONS_PARENTS]: { table: 'parent_notifications', cols: ['id', 'parent_id', 'eleve_id', 'annee_scolaire', 'titre', 'message', 'type', 'date_envoi', 'lu', 'created_at'] },
+  [STORAGE_KEYS.COEFFICIENTS_CLASSES]: { table: 'coefficients_classes', cols: ['id', 'annee_scolaire', 'classe_id', 'matiere_id', 'coefficient', 'updated_at', 'created_at'] },
   [STORAGE_KEYS.AUDIT_LOGS]: { table: 'audit_logs', cols: ['id', 'user_id', 'user_nom', 'user_role', 'action', 'table_cible', 'record_id', 'details', 'created_at'], noDelete: true },
 };
 
@@ -361,6 +363,8 @@ class StorageEngine {
 
   public init(): void {
     try {
+      // Le calcul des moyennes utilise le coefficient propre à chaque classe.
+      setCoefficientResolver((matiereId, classeId, annee) => this.getCoefficientMatiere(matiereId, classeId, annee));
       // Mode production : la base Supabase est la seule source de vérité.
       // Aucune donnée locale, aucun compte ni élève de démonstration n'est créé.
       if (checkIsSupabaseConfigured()) {
@@ -1351,6 +1355,22 @@ class StorageEngine {
 
     if (!operator || (!this.canAdminister(operator) && operator.role !== 'ENSEIGNANT')) {
       throw new Error("Action non autorisée : Seul le Censeur ou l'enseignant titulaire peut ajuster ce coefficient.");
+    }
+
+    // Un enseignant ne modifie que le coefficient de SA matière dans SES classes (affectation active).
+    if (!this.canAdminister(operator)) {
+      const anneeCible = annee || this.getActiveAnneeScolaire().libelle;
+      const titulaire = this.getItem<import('../types').AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, []).some(
+        (a) =>
+          a.profile_id === operator.id &&
+          a.classe_id === classeId &&
+          a.matiere_id === matiereId &&
+          a.annee_scolaire === anneeCible &&
+          a.statut === 'ACTIF'
+      );
+      if (!titulaire) {
+        throw new Error('Action non autorisée : vous ne pouvez modifier que le coefficient de votre matière dans vos classes.');
+      }
     }
 
     const all = this.getItem<import('../types').CoefficientClasse[]>(STORAGE_KEYS.COEFFICIENTS_CLASSES, []);
