@@ -116,6 +116,13 @@ export const DashboardCenseur: React.FC<DashboardCenseurProps> = ({ onNavigate }
               <span>Historique des années</span>
             </button>
             <button
+              id="btn-censeur-goto-export-notes"
+              onClick={() => onNavigate('export_notes')}
+              className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5"
+            >
+              <span>Export des notes (Excel)</span>
+            </button>
+            <button
               onClick={() => onNavigate('pedagogique')}
               className="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-sm cursor-pointer"
             >
