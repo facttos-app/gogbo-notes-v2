@@ -25,6 +25,7 @@ import { JournalAudit } from './components/censeur/JournalAudit';
 import { ParametresEtablissement } from './components/censeur/ParametresEtablissement';
 import { HistoriqueAnneesScolaires } from './components/censeur/HistoriqueAnneesScolaires';
 import { ExportNotesSemestre } from './components/censeur/ExportNotesSemestre';
+import { ImportEleves } from './components/censeur/ImportEleves';
 import { DirecteurDashboard } from './components/directeur/DirecteurDashboard';
 import { SurveillantDashboard } from './components/surveillant/SurveillantDashboard';
 import { ComptableDashboard } from './components/comptable/ComptableDashboard';
@@ -65,6 +66,7 @@ const TAB_TITLES: Record<TabKey, string> = {
   comptable: 'Comptabilité & Versements Scolaires',
   historique_annees: 'Archives & Historique des Années',
   export_notes: 'Export des notes par semestre',
+  import_eleves: 'Inscrire des élèves depuis un fichier',
 };
 
 const MainAppContent: React.FC = () => {
@@ -228,6 +230,8 @@ const MainAppContent: React.FC = () => {
         );
       case 'export_notes':
         return <ExportNotesSemestre />;
+      case 'import_eleves':
+        return <ImportEleves />;
       case 'directeur_stats':
         return <DirecteurDashboard onNavigate={handleNavigate} />;
       case 'surveillant':
