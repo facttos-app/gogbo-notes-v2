@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAnnee } from '../../context/AnneeContext';
 import { storage } from '../../lib/storage';
-import { construireExportNotes } from '../../lib/exportNotes';
-import { telechargerXlsx } from '../../lib/exportXlsx';
+import { construireExportNotes, ID_CONDUITE_SEULE } from '../../lib/exportNotes';
+import { genererXlsx, telechargerXlsx, telechargerZip } from '../../lib/exportXlsx';
 import { Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import type { Eleve } from '../../types';
 
@@ -30,6 +30,7 @@ export const ExportNotesSemestre: React.FC = () => {
   const matieres = useMemo(() => storage.getMatieres(), []);
   const affectations = useMemo(() => storage.getAffectations(anneeLibelle), [anneeLibelle]);
   const notes = useMemo(() => storage.getNotes(), []);
+  const notesConduite = useMemo(() => storage.getNotesConduite(anneeLibelle), [anneeLibelle]);
   const periode = useMemo(
     () => storage.getPeriodesByAnnee(anneeLibelle).find((p) => p.code === semestre),
     [anneeLibelle, semestre]
@@ -48,7 +49,9 @@ export const ExportNotesSemestre: React.FC = () => {
         .filter((a) => a.statut === 'ACTIF' && (!classeId || a.classe_id === classeId))
         .map((a) => a.matiere_id)
     );
-    return matieres.filter((m) => ids.has(m.id)).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+    return matieres
+      .filter((m) => ids.has(m.id) && m.code !== 'CONDUITE')
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   }, [affectations, matieres, classeId]);
 
   const resultat = useMemo(() => {
@@ -58,12 +61,13 @@ export const ExportNotesSemestre: React.FC = () => {
       matieres,
       affectations,
       notes,
+      notesConduite,
       periode,
       elevesParClasse,
       classeId: classeId || undefined,
       matiereId: matiereId || undefined,
     });
-  }, [periode, classes, matieres, affectations, notes, elevesParClasse, classeId, matiereId]);
+  }, [periode, classes, matieres, affectations, notes, notesConduite, elevesParClasse, classeId, matiereId]);
 
   if (!isCenseur) {
     return (
@@ -73,20 +77,32 @@ export const ExportNotesSemestre: React.FC = () => {
     );
   }
 
+  const classesAvecPages = resultat ? resultat.classes.filter((c) => c.feuilles.length > 0) : [];
+
   const telecharger = () => {
-    if (!resultat || resultat.feuilles.length === 0 || !periode) return;
-    const classeNom = classeId ? classes.find((c) => c.id === classeId)?.nom || 'classe' : 'toutes_classes';
-    const matiereNom = matiereId ? matieres.find((m) => m.id === matiereId)?.nom || 'matiere' : 'toutes_matieres';
-    const nom = `notes_${semestre}_${anneeLibelle}_${nomFichierSur(classeNom)}_${nomFichierSur(matiereNom)}`.slice(0, 120);
-    telechargerXlsx(`${nom}.xlsx`, resultat.feuilles);
+    if (!resultat || !periode || classesAvecPages.length === 0) return;
+    const base = `${semestre}_${anneeLibelle}`;
+    if (classeId) {
+      const c = classesAvecPages[0];
+      telechargerXlsx(`${nomFichierSur(c.classe.nom)}_${base}.xlsx`, c.feuilles);
+    } else {
+      telechargerZip(
+        `notes_toutes_classes_${base}.zip`,
+        classesAvecPages.map((c) => ({
+          nom: `${nomFichierSur(c.classe.nom)}_${base}.xlsx`,
+          contenu: genererXlsx(c.feuilles),
+        }))
+      );
+    }
     if (currentUser) {
+      const classeNom = classeId ? classes.find((c) => c.id === classeId)?.nom || 'classe' : 'toutes les classes';
       storage.addAuditLog({
         user_id: currentUser.id,
         user_nom: `${currentUser.nom} ${currentUser.prenom}`,
         user_role: currentUser.role,
         action: 'EXPORT_NOTES_SEMESTRE',
         table_cible: 'notes',
-        details: `Export Excel ${periode.nom} ${anneeLibelle} : ${resultat.totalLignes} lignes (${classeNom}, ${matiereNom}).`,
+        details: `Export Excel ${periode.nom} ${anneeLibelle} : ${resultat.totalLignes} lignes (${classeNom}).`,
       });
     }
   };
@@ -99,8 +115,9 @@ export const ExportNotesSemestre: React.FC = () => {
           <h2 className="text-base font-black text-slate-900">Export des notes par semestre</h2>
         </div>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Fichier Excel avec, pour chaque élève et chaque matière : nom, prénoms, classe, matière, moyenne
-          d’interrogation, devoir 1 et devoir 2. Une feuille par classe. Année {anneeLibelle}.
+          Un classeur Excel par classe. Chaque matière a sa page, avec matricule, nom, prénoms, sexe, date et lieu de
+          naissance, moyenne d’interrogation, devoir 1 et devoir 2. La page « Conduite » contient une seule moyenne.
+          Année {anneeLibelle}.
         </p>
       </div>
 
@@ -136,7 +153,7 @@ export const ExportNotesSemestre: React.FC = () => {
             }}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white"
           >
-            <option value="">Toutes les classes</option>
+            <option value="">Toutes les classes (un classeur par classe, dans un ZIP)</option>
             {[...classes]
               .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
               .map((c) => (
@@ -148,19 +165,20 @@ export const ExportNotesSemestre: React.FC = () => {
         </div>
 
         <div>
-          <label htmlFor="export-matiere" className="block text-xs font-bold text-slate-700 mb-1.5">Matière</label>
+          <label htmlFor="export-matiere" className="block text-xs font-bold text-slate-700 mb-1.5">Pages à inclure</label>
           <select
             id="export-matiere"
             value={matiereId}
             onChange={(e) => setMatiereId(e.target.value)}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white"
           >
-            <option value="">Toutes les matières</option>
+            <option value="">Toutes les matières et la conduite</option>
             {matieresProposees.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.nom}
+                {m.nom} uniquement
               </option>
             ))}
+            <option value={ID_CONDUITE_SEULE}>Conduite uniquement</option>
           </select>
         </div>
       </div>
@@ -175,41 +193,40 @@ export const ExportNotesSemestre: React.FC = () => {
       {resultat && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
           <div className="text-xs text-slate-700">
-            <strong>{resultat.totalLignes}</strong> ligne(s) à exporter, dont{' '}
+            <strong>{resultat.totalLignes}</strong> ligne(s) dans <strong>{classesAvecPages.length}</strong> classeur(s),
+            dont{' '}
             <strong className={resultat.totalSansNote > 0 ? 'text-amber-700' : 'text-emerald-700'}>
               {resultat.totalSansNote}
             </strong>{' '}
             sans aucune note (cellules laissées vides).
           </div>
-          {resultat.resumes.filter((r) => r.lignes > 0).length > 0 && (
+          {classesAvecPages.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="text-slate-500 border-b border-slate-200">
                     <th className="py-1.5 pr-3 font-bold">Classe</th>
                     <th className="py-1.5 pr-3 font-bold">Élèves</th>
-                    <th className="py-1.5 pr-3 font-bold">Matières</th>
+                    <th className="py-1.5 pr-3 font-bold">Pages</th>
                     <th className="py-1.5 pr-3 font-bold">Lignes</th>
                     <th className="py-1.5 font-bold">Sans note</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {resultat.resumes
-                    .filter((r) => r.lignes > 0)
-                    .map((r) => (
-                      <tr key={r.classe} className="border-b border-slate-100 text-slate-800">
-                        <td className="py-1.5 pr-3 font-semibold">{r.classe}</td>
-                        <td className="py-1.5 pr-3">{r.eleves}</td>
-                        <td className="py-1.5 pr-3">{r.matieres}</td>
-                        <td className="py-1.5 pr-3">{r.lignes}</td>
-                        <td className="py-1.5">{r.lignesSansNote}</td>
-                      </tr>
-                    ))}
+                  {classesAvecPages.map((c) => (
+                    <tr key={c.classe.id} className="border-b border-slate-100 text-slate-800">
+                      <td className="py-1.5 pr-3 font-semibold">{c.classe.nom}</td>
+                      <td className="py-1.5 pr-3">{c.eleves}</td>
+                      <td className="py-1.5 pr-3">{c.feuilles.length}</td>
+                      <td className="py-1.5 pr-3">{c.lignes}</td>
+                      <td className="py-1.5">{c.lignesSansNote}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
-          {resultat.totalLignes === 0 && (
+          {classesAvecPages.length === 0 && (
             <div className="text-xs text-amber-800">
               Aucune ligne : aucune matière n’est attribuée à cette sélection pour l’année {anneeLibelle}.
             </div>
@@ -218,11 +235,11 @@ export const ExportNotesSemestre: React.FC = () => {
             id="btn-export-notes-semestre"
             type="button"
             onClick={telecharger}
-            disabled={resultat.totalLignes === 0}
+            disabled={classesAvecPages.length === 0}
             className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-sm px-4 py-3 rounded-xl transition-colors flex items-center justify-center space-x-2"
           >
             <Download className="w-4 h-4" />
-            <span>Télécharger le fichier Excel</span>
+            <span>{classeId ? 'Télécharger le classeur Excel' : 'Télécharger les classeurs (ZIP)'}</span>
           </button>
         </div>
       )}
