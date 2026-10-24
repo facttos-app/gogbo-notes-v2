@@ -4,7 +4,6 @@ import { useAnnee } from '../context/AnneeContext';
 import { storage } from '../lib/storage';
 import { 
   GraduationCap, 
-  LogOut, 
   UserCheck, 
   Menu, 
   X, 
@@ -25,10 +24,9 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal, onOpenMonCompte, onOpenSauvegardeModal }) => {
-  const { currentUser, logout, switchUser } = useAuth();
+  const { currentUser } = useAuth();
   const { annees, activeAnnee, selectedAnnee, setSelectedAnnee, isArchive } = useAnnee();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const profiles = storage.getProfiles();
   const periodesList = storage.getPeriodesByAnnee(selectedAnnee?.libelle || '2026–2027');
   const activePeriode = periodesList.find((p) => p.is_active) || periodesList[0] || storage.getActivePeriode();
   const params = storage.getParametres();
@@ -84,16 +82,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
       {/* Barre principale */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
         {/* Identité CEG GOGBO */}
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-emerald-700 text-amber-300 flex items-center justify-center font-bold text-lg sm:text-xl shadow-inner border border-emerald-500/50">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-emerald-700 text-amber-300 flex items-center justify-center font-bold text-lg sm:text-xl shadow-inner border border-emerald-500/50 shrink-0">
             <GraduationCap className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <h1 className="font-bold text-base sm:text-lg tracking-tight text-white leading-tight">
+              <h1 className="font-bold text-base sm:text-lg tracking-tight text-white leading-tight truncate">
                 CEG GOGBO
               </h1>
-              <span className="bg-amber-500/20 text-amber-300 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-500/30 uppercase">
+              <span className="hidden sm:inline-block bg-amber-500/20 text-amber-300 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-500/30 uppercase whitespace-nowrap">
                 GOGBO NOTES V2
               </span>
             </div>
@@ -169,9 +167,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
         </div>
 
         {/* Profil utilisateur & Sélecteur de rôle */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           {currentUser && (
-            <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700 px-2 sm:px-3 py-1 rounded-lg">
+            <div className="flex items-center bg-slate-800/90 border border-slate-700 px-1.5 sm:px-3 py-1 rounded-lg">
               <button
                 id="header-btn-mon-compte"
                 type="button"
@@ -182,43 +180,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">
                   {currentUser.prenom.charAt(0)}{currentUser.nom.charAt(0)}
                 </div>
-                <div className="text-left hidden sm:block">
-                  <div className="text-xs font-semibold text-white leading-tight">
+                <div className="text-left hidden sm:block max-w-[10rem] lg:max-w-[16rem]">
+                  <div className="text-xs font-semibold text-white leading-tight truncate">
                     {currentUser.prenom} {currentUser.nom}
                   </div>
-                  <div className="text-[10px] text-amber-300 font-medium">
+                  <div className="text-[10px] text-amber-300 font-medium truncate">
                     {getRoleLabel(currentUser.role)}
                     {currentUser.is_enseignant && currentUser.role !== 'ENSEIGNANT' && (
                       <span className="text-emerald-300 ml-1">(+ Enseignant)</span>
                     )}
                   </div>
                 </div>
-              </button>
-
-              {/* Changement de compte / test direct */}
-              <div className="pl-1 border-l border-slate-700 ml-1">
-                <select
-                  id="select-active-user"
-                  aria-label="Changer d'utilisateur connecté"
-                  value={currentUser.id}
-                  onChange={(e) => switchUser(e.target.value)}
-                  className="bg-slate-900 text-slate-200 text-xs rounded border border-slate-700 py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                >
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nom} {p.prenom} — {p.role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                id="btn-header-logout"
-                onClick={logout}
-                title="Déconnexion"
-                className="p-1.5 text-slate-400 hover:text-red-400 transition-colors ml-1"
-              >
-                <LogOut className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -237,6 +209,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
       {/* Menu mobile déroulant */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-slate-800 border-t border-slate-700 px-4 py-3 space-y-3">
+          {currentUser && (
+            <div className="sm:hidden text-xs pb-2 border-b border-slate-700">
+              <div className="font-semibold text-white">
+                {currentUser.prenom} {currentUser.nom}
+              </div>
+              <div className="text-[11px] text-amber-300">{getRoleLabel(currentUser.role)}</div>
+            </div>
+          )}
           <div className="text-xs text-slate-300 pb-2 border-b border-slate-700 flex justify-between">
             <span>Période active : <strong className="text-emerald-400">{activePeriode.nom}</strong></span>
             <span>Année <strong>{params.annee_academique}</strong></span>
