@@ -45,7 +45,8 @@ export type TabKey =
   | 'directeur_stats'
   | 'surveillant'
   | 'comptable'
-  | 'historique_annees';
+  | 'historique_annees'
+  | 'export_notes';
 
 interface NavigationProps {
   currentTab: TabKey;
@@ -138,6 +139,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
         { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
         { key: 'matieres', label: 'Matières & Coefs', icon: <Layers className="w-4 h-4" /> },
+        { key: 'export_notes', label: 'Export des notes (semestre)', icon: <FileText className="w-4 h-4 text-emerald-400" />, badge: 'Excel' },
         { key: 'periodes', label: 'Périodes', icon: <CalendarDays className="w-4 h-4" /> },
         { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-500" />, badge: 'Archives' },
         { key: 'audit', label: 'Journal d’Audit', icon: <History className="w-4 h-4" /> },
