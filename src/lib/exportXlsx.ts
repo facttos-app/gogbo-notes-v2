@@ -237,6 +237,26 @@ export function genererXlsx(feuilles: FeuilleXlsx[]): Uint8Array {
   return creerZip(fichiers);
 }
 
+export function genererZipDeFichiers(fichiers: { nom: string; contenu: Uint8Array }[]): Uint8Array {
+  return creerZip(fichiers);
+}
+
+function declencherTelechargement(octets: Uint8Array, type: string, nomFichier: string): void {
+  const blob = new Blob([octets as BlobPart], { type });
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement('a');
+  lien.href = url;
+  lien.download = nomFichier;
+  document.body.appendChild(lien);
+  lien.click();
+  document.body.removeChild(lien);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+export function telechargerZip(nomFichier: string, fichiers: { nom: string; contenu: Uint8Array }[]): void {
+  declencherTelechargement(creerZip(fichiers), 'application/zip', nomFichier);
+}
+
 export function telechargerXlsx(nomFichier: string, feuilles: FeuilleXlsx[]): void {
   const octets = genererXlsx(feuilles);
   const blob = new Blob([octets as BlobPart], {

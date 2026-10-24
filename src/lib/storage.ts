@@ -275,11 +275,22 @@ class StorageEngine {
     }
   }
 
+  // Les envois vers la base sont exécutés l'un après l'autre, dans l'ordre : un élève est toujours enregistré
+  // avant son inscription (clé étrangère), même lors d'un import de plusieurs dizaines d'élèves.
+  private pushQueue: Promise<void> = Promise.resolve();
+
+  /** Attend la fin des enregistrements en cours vers la base centrale. */
+  public attendreSynchronisation(): Promise<void> {
+    return this.pushQueue;
+  }
+
   /** Ne garde que les colonnes qui existent dans la table Supabase. */
   private pickColumns(row: Record<string, unknown>, cols: string[]): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const c of cols) {
-      if (row[c] !== undefined) out[c] = row[c];
+      if (row[c] === undefined) continue;
+      // Une date vide est enregistrée « non renseignée » (NULL) : la base refuse une chaîne vide pour une date.
+      out[c] = row[c] === '' && (c.startsWith('date_') || c.endsWith('_at')) ? null : row[c];
     }
     return out;
   }
@@ -327,7 +338,7 @@ class StorageEngine {
       : prevList.filter((r) => r && r.id != null && !nextIds.has(String(r.id))).map((r) => String(r.id));
     if (changed.length === 0 && removed.length === 0) return;
 
-    void (async () => {
+    this.pushQueue = this.pushQueue.then(async () => {
       try {
         const { data: sess } = await client.auth.getSession();
         if (!sess?.session) return;
@@ -347,7 +358,7 @@ class StorageEngine {
       } catch (err) {
         this.reportSyncError(spec.table, err instanceof Error ? err.message : String(err));
       }
-    })();
+    });
   }
 
   /** Efface le cache local (appareil partagé) : les données réelles restent dans Supabase. */
