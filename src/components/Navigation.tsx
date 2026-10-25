@@ -262,7 +262,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
   const tabs = getTabs();
 
   return (
-    <nav id="nav-gogbo-tabs" className="bg-white border-b border-slate-200 sticky top-[73px] sm:top-[77px] z-30 shadow-xs">
+    <nav id="nav-gogbo-tabs" className="bg-white border-b border-slate-200 sticky top-[73px] sm:top-[77px] z-30 shadow-xs print:hidden">
       <div className="max-w-7xl mx-auto px-2 sm:px-6">
         <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto py-2 scrollbar-none no-scrollbar">
           {/* BOUTON DE DÉCONNEXION OBLIGATOIREMENT À GAUCHE (EXIGENCE 14) */}

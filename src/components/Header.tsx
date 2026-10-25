@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
   };
 
   return (
-    <header id="header-gogbo" className="bg-slate-900 text-white shadow-md border-b border-emerald-700/40 sticky top-0 z-40">
+    <header id="header-gogbo" className="bg-slate-900 text-white shadow-md border-b border-emerald-700/40 sticky top-0 z-40 print:hidden">
       {/* Bandeau officiel Bénin */}
       <div className="bg-emerald-800 text-emerald-100 text-xs px-3 py-1 flex flex-wrap justify-between items-center border-b border-emerald-900 font-sans tracking-wide">
         <div className="flex items-center space-x-2">
