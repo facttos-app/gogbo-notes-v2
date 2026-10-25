@@ -104,6 +104,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         { key: 'professeurs_principaux', label: 'Professeurs Principaux', icon: <UserCheck className="w-4 h-4 text-indigo-400" /> },
         { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
         { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' },
+        { key: 'comptable', label: 'Activités Comptable', icon: <CreditCard className="w-4 h-4 text-teal-400" /> },
         { key: 'audit', label: 'Journal d’Audit', icon: <History className="w-4 h-4" /> }
       );
       return tabs;
@@ -144,6 +145,7 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
         { key: 'import_eleves', label: 'Inscrire des élèves (fichier)', icon: <Users className="w-4 h-4 text-emerald-400" />, badge: 'Import' },
         { key: 'periodes', label: 'Périodes', icon: <CalendarDays className="w-4 h-4" /> },
         { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-500" />, badge: 'Archives' },
+        { key: 'comptable', label: 'Activités Comptable', icon: <CreditCard className="w-4 h-4 text-teal-400" /> },
         { key: 'audit', label: 'Journal d’Audit', icon: <History className="w-4 h-4" /> },
         { key: 'parametres', label: 'Paramètres', icon: <Settings className="w-4 h-4" /> }
       );
@@ -251,8 +253,6 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onSelectTab,
       { key: 'presence_enseignants', label: 'Présence Enseignants', icon: <CalendarCheck className="w-4 h-4 text-emerald-400" /> },
       { key: 'classes', label: 'Classes (28)', icon: <School className="w-4 h-4" /> },
       { key: 'surveillant', label: 'Surveillance & Discipline', icon: <ShieldCheck className="w-4 h-4 text-blue-400" /> },
-      { key: 'comptable', label: 'Activités Comptable', icon: <CreditCard className="w-4 h-4 text-teal-400" /> },
-      { key: 'audit', label: 'Activités du Censeur', icon: <History className="w-4 h-4" /> },
       { key: 'historique_annees', label: 'Historique des années', icon: <History className="w-4 h-4 text-amber-400" />, badge: 'Archives' }
     );
 

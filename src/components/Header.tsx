@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { checkIsSupabaseConfigured } from '../lib/supabase';
 import { useAnnee } from '../context/AnneeContext';
 import { storage } from '../lib/storage';
 import { 
@@ -25,6 +26,9 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal, onOpenMonCompte, onOpenSauvegardeModal }) => {
   const { currentUser } = useAuth();
+  // En production (base centrale connectée), la suite de tests est masquée : elle écrirait de fausses données.
+  const enProduction = checkIsSupabaseConfigured();
+  const estConcepteur = currentUser?.role === 'CONCEPTEUR';
   const { annees, activeAnnee, selectedAnnee, setSelectedAnnee, isArchive } = useAnnee();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const periodesList = storage.getPeriodesByAnnee(selectedAnnee?.libelle || '2026–2027');
@@ -135,7 +139,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
             )}
           </div>
 
-          <button
+          {!enProduction && (
+<button
             id="btn-run-tests"
             onClick={onOpenTestModal}
             className="flex items-center space-x-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium"
@@ -144,8 +149,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Validation des 25 Tests (A-G & 1-25)</span>
           </button>
+)}
 
-          <button
+          {estConcepteur && (
+<button
             id="btn-view-sql"
             onClick={onOpenSqlModal}
             className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
@@ -154,6 +161,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
             <FileText className="w-3.5 h-3.5 text-emerald-400" />
             <span>SQL Supabase</span>
           </button>
+)}
 
           <button
             id="btn-sauvegarde-integrale"
@@ -223,7 +231,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
           </div>
 
           <div className="flex flex-col space-y-2">
-            <button
+            {!enProduction && (
+<button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onOpenTestModal();
@@ -233,8 +242,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
               <CheckCircle2 className="w-4 h-4" />
               <span>Lancer la vérification des 14 Tests</span>
             </button>
+)}
 
-            <button
+            {estConcepteur && (
+<button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onOpenSqlModal();
@@ -244,6 +255,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestModal, onOpenSqlModal,
               <FileText className="w-4 h-4 text-emerald-400" />
               <span>Voir le schéma SQL Supabase / PostgreSQL</span>
             </button>
+)}
 
             <button
               onClick={() => {
