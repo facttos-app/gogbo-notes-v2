@@ -165,7 +165,7 @@ const REMOTE_TABLES: Record<string, { table: string; cols: string[]; noDelete?: 
   [STORAGE_KEYS.NOTES]: { table: 'notes', cols: ['id', 'eleve_id', 'affectation_id', 'periode_id', 'annee_scolaire', 'valeur', 'type_evaluation', 'saisi_par', 'observation', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.PRESENCES]: { table: 'presences', cols: ['id', 'annee_scolaire', 'classe_id', 'eleve_id', 'date', 'statut', 'motif', 'justifie', 'heure_retard', 'enregistre_par_id', 'enregistre_par_nom', 'date_saisie', 'periode_id', 'enseignant_id', 'enseignant_nom', 'matiere_id', 'matiere_nom', 'seance_id', 'heure_debut', 'heure_fin', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.PRESENCES_ENSEIGNANTS]: { table: 'presences_enseignants', cols: ['id', 'annee_scolaire', 'date', 'enseignant_id', 'enseignant_nom', 'matieres_attribuees', 'statut', 'motif', 'heure_arrivee', 'enregistre_par_id', 'enregistre_par_nom', 'created_at', 'updated_at'] },
-  [STORAGE_KEYS.PROFESSEURS_PRINCIPAUX]: { table: 'professeurs_principaux', cols: ['id', 'profile_id', 'classe_id', 'annee_scolaire', 'statut', 'date_nomination', 'date_fin', 'motif_fin', 'created_at', 'updated_at'] },
+  [STORAGE_KEYS.PROFESSEURS_PRINCIPAUX]: { table: 'professeurs_principaux', cols: ['id', 'profile_id', 'classe_id', 'annee_scolaire', 'statut', 'date_nomination', 'date_fin', 'motif_fin', 'created_at', 'updated_at', 'autorise_inscription'] },
   [STORAGE_KEYS.PAIEMENTS]: { table: 'paiements_contributions', cols: ['id', 'numero_recu', 'annee_scolaire', 'eleve_id', 'classe_id', 'tranche', 'contribution_id', 'contribution_libelle', 'categorie_contribution', 'montant_paye', 'montant_total_exige', 'reste_a_payer', 'statut_paiement', 'mode_paiement', 'reference_recu', 'observation', 'enregistre_par_id', 'enregistre_par_nom', 'date_paiement', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.CONTRIBUTIONS]: { table: 'contributions', cols: ['id', 'libelle', 'categorie', 'annee_scolaire', 'montant_prevu', 'public_cible', 'classe_id', 'observation', 'statut', 'created_at', 'updated_at'] },
   [STORAGE_KEYS.DEPENSES]: { table: 'depenses_budgetaires', cols: ['id', 'annee_scolaire', 'libelle', 'categorie', 'montant_alloue', 'montant_depense', 'date_depense', 'beneficiaire', 'piece_justificative', 'observation', 'enregistre_par_id', 'enregistre_par_nom', 'created_at', 'updated_at'] },
@@ -370,6 +370,44 @@ class StorageEngine {
 
   public canAdminister(operator: UserProfile): boolean {
     return operator.role === 'CENSEUR' || operator.role === 'DIRECTEUR_GENERAL' || operator.role === 'CONCEPTEUR';
+  }
+
+  /** Seuls le Censeur et le Concepteur inscrivent enseignants, élèves, parents et membres de l'administration. */
+  public canRegisterPeople(operator: UserProfile): boolean {
+    return operator.role === 'CENSEUR' || operator.role === 'CONCEPTEUR';
+  }
+
+  /** Le PP de la classe peut inscrire des élèves seulement si le Censeur lui en a donné l'autorisation. */
+  public isPPAutoriseInscription(profileId: string, classeId: string, anneeScolaire: string): boolean {
+    const pp = this.getActiveProfesseurPrincipalByEnseignant(profileId, anneeScolaire);
+    return !!(pp && pp.classe_id === classeId && pp.statut === 'ACTIF' && pp.autorise_inscription === true);
+  }
+
+  public setAutorisationInscriptionPP(ppId: string, autorise: boolean, operator: UserProfile): ProfesseurPrincipal {
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : seul le Censeur (ou le Concepteur) peut autoriser un Professeur Principal à inscrire des élèves.");
+    }
+    const list = this.getItem<ProfesseurPrincipal[]>(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, []);
+    const idx = list.findIndex((x) => x.id === ppId);
+    if (idx === -1) throw new Error('Professeur Principal introuvable.');
+    const maj: ProfesseurPrincipal = { ...list[idx], autorise_inscription: autorise, updated_at: new Date().toISOString() };
+    list[idx] = maj;
+    this.setItem(STORAGE_KEYS.PROFESSEURS_PRINCIPAUX, list);
+    this.addAuditLog({
+      user_id: operator.id,
+      user_nom: `${operator.nom} ${operator.prenom}`,
+      user_role: operator.role,
+      action: autorise ? 'AUTORISATION_INSCRIPTION_PP' : 'RETRAIT_AUTORISATION_INSCRIPTION_PP',
+      table_cible: 'professeurs_principaux',
+      details: `${autorise ? 'Autorisation' : 'Retrait de l\'autorisation'} d'inscrire des élèves pour le PP ${maj.profile_id} (classe ${maj.classe_id}).`,
+    });
+    return maj;
+  }
+
+  /** Nom du Directeur affiché sur les bulletins : celui du compte Directeur Général inscrit sur la plateforme. */
+  public getDirecteurNom(): string {
+    const dg = this.getProfiles().find((p) => p.role === 'DIRECTEUR_GENERAL' && p.statut === 'ACTIF');
+    return dg ? `${dg.nom} ${dg.prenom}`.replace(/\s+/g, ' ').trim() : '';
   }
 
   public init(): void {
@@ -738,16 +776,38 @@ class StorageEngine {
       let itemsCount = 0;
       const errors: string[] = [];
       for (const [key, spec] of Object.entries(REMOTE_TABLES)) {
-        let query = client.from(spec.table).select('*');
+        // Lecture par pages de 1000 lignes : la base ne renvoie jamais plus de 1000 lignes par requête.
+        const rows: Record<string, unknown>[] = [];
+        let erreurTable: string | null = null;
         if (spec.table === 'audit_logs') {
-          query = query.order('created_at', { ascending: false }).limit(200);
+          const { data, error } = await client
+            .from(spec.table)
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+          if (error) erreurTable = error.message;
+          else rows.push(...((data ?? []) as Record<string, unknown>[]));
+        } else {
+          const taillePage = 1000;
+          for (let page = 0; page < 200; page++) {
+            const { data, error } = await client
+              .from(spec.table)
+              .select('*')
+              .order('id', { ascending: true })
+              .range(page * taillePage, page * taillePage + taillePage - 1);
+            if (error) {
+              erreurTable = error.message;
+              break;
+            }
+            const lot = (data ?? []) as Record<string, unknown>[];
+            rows.push(...lot);
+            if (lot.length < taillePage) break;
+          }
         }
-        const { data, error } = await query;
-        if (error) {
-          errors.push(`${spec.table}: ${error.message}`);
+        if (erreurTable) {
+          errors.push(`${spec.table}: ${erreurTable}`);
           continue;
         }
-        const rows = data ?? [];
         // rawSet : le cache local est remplacé par l'état réel de la base, sans réécriture vers Supabase
         this.rawSet(key, JSON.stringify(rows));
         itemsCount += rows.length;
@@ -846,8 +906,13 @@ class StorageEngine {
     operator: UserProfile
   ): UserProfile {
     // Vérification stricte des permissions (Point 10 & 11 : Censeur, Concepteur, DG)
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de créer un compte personnel.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur a le droit de créer un compte personnel.");
+    }
+    if (checkIsSupabaseConfigured()) {
+      throw new Error(
+        "La création d'un nouveau compte se fait pour l'instant dans Supabase (Authentication, puis rattachement du profil). La création automatique depuis l'application sera ajoutée avec la fonction sécurisée prévue."
+      );
     }
 
     const profiles = this.getProfiles();
@@ -921,8 +986,8 @@ class StorageEngine {
     operator: UserProfile
   ): UserProfile {
     // Vérification stricte des permissions (Point 10 & 11 : Censeur, Concepteur, DG)
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction Générale a le droit de modifier les informations administratives des personnels.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur a le droit de modifier les informations administratives des personnels.");
     }
 
     const profiles = this.getProfiles();
@@ -952,27 +1017,33 @@ class StorageEngine {
       details: `Modification du compte: ${updated.nom} ${updated.prenom} (${updated.email})`,
     });
 
-    // Synchronisation avec Supabase si connecté
-    if (isSupabaseConfigured) {
+    // Enregistrement dans la base centrale (l'e-mail de connexion n'est jamais modifié ici)
+    if (checkIsSupabaseConfigured()) {
       const client = getSupabaseClient();
       if (client) {
-        void (async () => {
+        this.pushQueue = this.pushQueue.then(async () => {
           try {
-            const { error } = await client.from('profiles').update({
-              nom: updated.nom,
-              prenom: updated.prenom,
-              email: updated.email,
-              telephone: updated.telephone || null,
-              role: updated.role,
-              is_enseignant: updated.is_enseignant,
-              statut: updated.statut,
-              updated_at: updated.updated_at,
-            }).eq('id', id);
-            if (error) console.error('Erreur synchronisation Supabase (profiles update):', error.message);
+            const { data: sess } = await client.auth.getSession();
+            if (!sess?.session) return;
+            const { error } = await client
+              .from('profiles')
+              .update({
+                nom: updated.nom,
+                prenom: updated.prenom,
+                telephone: updated.telephone || null,
+                adresse: updated.adresse || null,
+                matiere: updated.matiere || null,
+                role: updated.role,
+                is_enseignant: updated.is_enseignant,
+                statut: updated.statut,
+                updated_at: updated.updated_at,
+              })
+              .eq('id', id);
+            if (error) this.reportSyncError('profiles', error.message);
           } catch (err) {
-            console.error('Exception Supabase profiles update:', err);
+            this.reportSyncError('profiles', err instanceof Error ? err.message : String(err));
           }
-        })();
+        });
       }
     }
 
@@ -1569,10 +1640,10 @@ class StorageEngine {
   }
 
   public canAdministerEleves(operator: UserProfile, classeId?: string, anneeScolaire?: string): boolean {
-    if (this.canAdminister(operator)) return true;
+    if (this.canRegisterPeople(operator)) return true;
     if (operator.role === 'ENSEIGNANT' && classeId) {
       const annee = anneeScolaire || this.getActiveAnneeScolaire().libelle;
-      return this.isProfesseurPrincipalOfClasse(operator.id, classeId, annee);
+      return this.isPPAutoriseInscription(operator.id, classeId, annee);
     }
     return false;
   }
@@ -1583,7 +1654,7 @@ class StorageEngine {
     logAudit = true
   ): InscriptionEleve {
     if (!this.canAdministerEleves(operator, data.classe_id, data.annee_scolaire)) {
-      throw new Error("Action non autorisée : Seul le Censeur, la Direction ou le Professeur Principal de cette classe a le droit d'inscrire des élèves.");
+      throw new Error("Action non autorisée : Seul le Censeur, le Concepteur ou le Professeur Principal autorisé de cette classe a le droit d'inscrire des élèves.");
     }
 
     const inscriptions = this.getInscriptions();
@@ -1899,8 +1970,8 @@ class StorageEngine {
   }
 
   public retirerEleveDeAnnee(eleveId: string, anneeScolaire: string, operator: UserProfile): boolean {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction peut retirer un élève d'une année scolaire.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur peut retirer un élève d'une année scolaire.");
     }
     const inscripts = this.getInscriptions();
     const idx = inscripts.findIndex((i) => i.eleve_id === eleveId && i.annee_scolaire === anneeScolaire);
@@ -2294,6 +2365,12 @@ class StorageEngine {
     userIdOrEmail: string,
     newPass: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (checkIsSupabaseConfigured()) {
+      return {
+        success: false,
+        error: "La réinitialisation d'un mot de passe se fait dans Supabase (Authentication, Users) : contactez l'administrateur technique.",
+      };
+    }
     const clean = userIdOrEmail.trim().toLowerCase();
     const profiles = this.getProfiles();
     let user = profiles.find((p) => p.id === userIdOrEmail || (p.email && p.email.toLowerCase() === clean));
@@ -2342,6 +2419,12 @@ class StorageEngine {
     userId: string,
     newEmail: string
   ): Promise<{ success: boolean; error?: string }> {
+    if (checkIsSupabaseConfigured()) {
+      return {
+        success: false,
+        error: "Le changement de l'identifiant de connexion est réservé à l'administration (Supabase, Authentication).",
+      };
+    }
     const cleanEmail = newEmail.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return { success: false, error: "Veuillez saisir une adresse email académique valide." };
@@ -3134,8 +3217,8 @@ class StorageEngine {
     data: Omit<PaiementContribution, 'id' | 'created_at' | 'updated_at'>,
     operator: UserProfile
   ): PaiementContribution {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut enregistrer des paiements de contributions scolaires.");
+    if (operator.role !== 'COMPTABLE') {
+      throw new Error("Action non autorisée : Seul le Comptable peut enregistrer des paiements de contributions scolaires.");
     }
     const list = this.getPaiements();
     const id = `pay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -3163,8 +3246,8 @@ class StorageEngine {
   }
 
   public deletePaiement(id: string, operator: UserProfile): boolean {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut supprimer un reçu.");
+    if (operator.role !== 'COMPTABLE') {
+      throw new Error("Action non autorisée : Seul le Comptable peut supprimer un reçu.");
     }
     const list = this.getPaiements();
     const updated = list.filter((p) => p.id !== id);
@@ -3194,8 +3277,8 @@ class StorageEngine {
     data: Omit<ContributionConfig, 'id' | 'created_at' | 'updated_at'>,
     operator: UserProfile
   ): ContributionConfig {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut créer des rubriques de contributions.");
+    if (operator.role !== 'COMPTABLE') {
+      throw new Error("Action non autorisée : Seul le Comptable peut créer des rubriques de contributions.");
     }
     const list = this.getContributions();
     const id = `cnt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -3227,7 +3310,7 @@ class StorageEngine {
     data: Partial<ContributionConfig>,
     operator: UserProfile
   ): ContributionConfig {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+    if (operator.role !== 'COMPTABLE') {
       throw new Error("Action non autorisée.");
     }
     const list = this.getContributions();
@@ -3254,7 +3337,7 @@ class StorageEngine {
   }
 
   public deleteContribution(id: string, operator: UserProfile): boolean {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+    if (operator.role !== 'COMPTABLE') {
       throw new Error("Action non autorisée.");
     }
     const list = this.getContributions();
@@ -3285,8 +3368,8 @@ class StorageEngine {
     data: Omit<DepenseBudgetaire, 'id' | 'created_at' | 'updated_at'>,
     operator: UserProfile
   ): DepenseBudgetaire {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Comptable ou l'Administration peut enregistrer une dépense.");
+    if (operator.role !== 'COMPTABLE') {
+      throw new Error("Action non autorisée : Seul le Comptable peut enregistrer une dépense.");
     }
     const list = this.getDepenses();
     const id = `dep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -3314,7 +3397,7 @@ class StorageEngine {
   }
 
   public deleteDepense(id: string, operator: UserProfile): boolean {
-    if (operator.role !== 'COMPTABLE' && !this.canAdminister(operator)) {
+    if (operator.role !== 'COMPTABLE') {
       throw new Error("Action non autorisée.");
     }
     const list = this.getDepenses();
@@ -3385,7 +3468,7 @@ class StorageEngine {
   ): NoteConduite {
     // Vérification des droits : L'opérateur DOIT être le PP ACTIF de la classe ou Censeur/DG/Concepteur
     const isPP = this.getActiveProfesseurPrincipalByEnseignant(operator.id, data.annee_scolaire)?.classe_id === data.classe_id;
-    const canManageConduite = isPP || this.canAdminister(operator);
+    const canManageConduite = isPP || operator.role === 'CENSEUR' || operator.role === 'CONCEPTEUR';
     if (!canManageConduite) {
       throw new Error("Action non autorisée : Seul le Professeur Principal de la classe (ou l'Administration) peut saisir ou modifier la note de conduite.");
     }
@@ -3919,8 +4002,8 @@ class StorageEngine {
     },
     operator: UserProfile
   ): ParentProfile {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur, le Concepteur ou la Direction peut créer un compte parent.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur peut créer un compte parent.");
     }
 
     const cleanTel = data.telephone.trim();
@@ -4012,8 +4095,8 @@ class StorageEngine {
     updates: Partial<ParentProfile>,
     operator: UserProfile
   ): ParentProfile {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction peut modifier un compte parent.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur peut modifier un compte parent.");
     }
     const parents = this.getParents();
     const idx = parents.findIndex((p) => p.id === id);
@@ -4059,7 +4142,7 @@ class StorageEngine {
   }
 
   public toggleParentStatus(id: string, operator: UserProfile): ParentProfile {
-    if (!this.canAdminister(operator)) {
+    if (!this.canRegisterPeople(operator)) {
       throw new Error("Action non autorisée.");
     }
     const parent = this.getParentById(id);
@@ -4085,8 +4168,8 @@ class StorageEngine {
     data: { parent_id: string; eleve_id: string; lien_parental: LienParental },
     operator: UserProfile
   ): ParentEleve {
-    if (!this.canAdminister(operator)) {
-      throw new Error("Action non autorisée : Seul le Censeur ou la Direction peut rattacher un élève à un parent.");
+    if (!this.canRegisterPeople(operator)) {
+      throw new Error("Action non autorisée : Seul le Censeur ou le Concepteur peut rattacher un élève à un parent.");
     }
     const links = this.getParentEleves();
     const existing = links.find((l) => l.parent_id === data.parent_id && l.eleve_id === data.eleve_id);
@@ -4131,7 +4214,7 @@ class StorageEngine {
   }
 
   public unlinkParentFromEleve(linkId: string, operator: UserProfile): boolean {
-    if (!this.canAdminister(operator)) {
+    if (!this.canRegisterPeople(operator)) {
       throw new Error("Action non autorisée.");
     }
     const links = this.getParentEleves();
