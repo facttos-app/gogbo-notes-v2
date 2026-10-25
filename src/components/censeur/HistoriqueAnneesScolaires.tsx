@@ -117,13 +117,13 @@ export const HistoriqueAnneesScolaires: React.FC<HistoriqueAnneesScolairesProps>
   const [bulletinModalEleve, setBulletinModalEleve] = useState<Eleve | null>(null);
 
   // Vérification de sécurité des permissions administratives
-  if (!isCenseur && !isDirecteur) {
+  if (!currentUser || currentUser.role === 'PARENT') {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-800">
         <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-        <h3 className="font-bold text-base">Accès restreint aux archives administratives</h3>
+        <h3 className="font-bold text-base">Accès réservé au personnel</h3>
         <p className="text-xs text-red-600 mt-1">
-          La consultation globale de l'historique des années scolaires est strictement réservée à l'Administration (Censeur et Direction Générale).
+          L'historique des années scolaires est réservé au personnel de l'établissement (enseignants et administration), en lecture seule.
         </p>
       </div>
     );
