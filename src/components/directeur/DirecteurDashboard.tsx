@@ -31,7 +31,7 @@ export const DirecteurDashboard: React.FC<DirecteurDashboardProps> = ({ onNaviga
               <span className="text-emerald-300 text-xs">• Supervision Académique Globale</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold mt-1 text-white">
-              Espace du Directeur — {params.directeur_nom}
+              Espace du Directeur — {storage.getDirecteurNom() || params.nom_etablissement}
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
               Consultation des effectifs, taux de parité, structure des 28 classes et accès à votre attribution de classe.
