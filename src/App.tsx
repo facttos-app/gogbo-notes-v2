@@ -268,7 +268,7 @@ const MainAppContent: React.FC = () => {
       />
 
       {erreurSync && (
-        <div role="alert" className="bg-red-600 text-white text-xs px-4 py-2.5 flex items-start justify-between space-x-3">
+        <div role="alert" className="print:hidden bg-red-600 text-white text-xs px-4 py-2.5 flex items-start justify-between space-x-3">
           <span>
             <strong>Enregistrement non effectué.</strong> Votre dernière saisie n’a pas été enregistrée dans la base
             centrale ({erreurSync}). Rechargez la page, vérifiez la saisie et recommencez ; si le message revient,
@@ -288,9 +288,9 @@ const MainAppContent: React.FC = () => {
       />
 
       {/* Corps principal avec Bouton Retour universel et intelligent (Exigence 2) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 print:p-0 print:max-w-none">
         {canGoBack && (
-          <div className="mb-3.5 flex items-center justify-between">
+          <div className="mb-3.5 flex items-center justify-between print:hidden">
             <button
               id="btn-retour-navigation"
               type="button"
@@ -311,7 +311,7 @@ const MainAppContent: React.FC = () => {
       </main>
 
       {/* Pied de page officiel Bénin */}
-      <footer className="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 text-center">
+      <footer className="print:hidden bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 text-center">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
           <div>
             <strong>GOGBO NOTES V2</strong> — Système Numérique Officiel de Gestion Scolaire • CEG GOGBO
