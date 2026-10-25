@@ -57,6 +57,24 @@ export const GestionProfesseursPrincipaux: React.FC<GestionProfesseursPrincipaux
   // Messages de retour
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Le Censeur (ou le Concepteur) autorise un PP à inscrire des élèves dans sa classe
+  const basculerInscription = (ppId: string, autorise: boolean) => {
+    if (!currentUser) return;
+    try {
+      storage.setAutorisationInscriptionPP(ppId, autorise, currentUser);
+      setRefreshKey((k) => k + 1);
+      setFeedback({
+        type: 'success',
+        message: autorise
+          ? 'Le Professeur Principal peut désormais inscrire des élèves dans sa classe.'
+          : "L'autorisation d'inscrire des élèves a été retirée.",
+      });
+      setTimeout(() => setFeedback(null), 4000);
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Action impossible.' });
+    }
+  };
+
   // Modal d'attribution
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
   const [formProfileId, setFormProfileId] = useState<string>('');
@@ -486,6 +504,7 @@ export const GestionProfesseursPrincipaux: React.FC<GestionProfesseursPrincipaux
                   <th className="px-3.5 py-2.5">Matière(s) de l'enseignant</th>
                   <th className="px-3.5 py-2.5">Année Scolaire</th>
                   <th className="px-3.5 py-2.5">Statut</th>
+                  <th className="px-3.5 py-2.5">Inscription des élèves</th>
                   <th className="px-3.5 py-2.5">Date de désignation</th>
                   {canManage && <th className="px-3.5 py-2.5 text-right">Actions</th>}
                 </tr>
@@ -546,6 +565,31 @@ export const GestionProfesseursPrincipaux: React.FC<GestionProfesseursPrincipaux
                           <span className={`w-1.5 h-1.5 rounded-full ${isActif ? 'bg-emerald-600' : 'bg-slate-400'}`}></span>
                           <span>{isActif ? 'PP ACTIF' : 'CLÔTURÉ'}</span>
                         </span>
+                      </td>
+
+                      {/* Autorisation d'inscrire des élèves (Censeur / Concepteur) */}
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        {isActif ? (
+                          isCenseur || isConcepteur ? (
+                            <button
+                              type="button"
+                              onClick={() => basculerInscription(pp.id, !pp.autorise_inscription)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                pp.autorise_inscription
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                  : 'bg-slate-50 text-slate-600 border-slate-300'
+                              }`}
+                            >
+                              {pp.autorise_inscription ? 'Autorisé' : 'Non autorisé'}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-slate-600">
+                              {pp.autorise_inscription ? 'Autorisé' : 'Non autorisé'}
+                            </span>
+                          )
+                        ) : (
+                          '—'
+                        )}
                       </td>
 
                       {/* Période d'exercice / Date de désignation */}

@@ -170,9 +170,11 @@ export const ParametresEtablissement: React.FC = () => {
                 <label className="block text-slate-700 font-semibold mb-1">Directeur Général</label>
                 <input
                   type="text"
-                  disabled={!isCenseur}
-                  value={directeur}
-                  onChange={(e) => setDirecteur(e.target.value)}
+                  disabled
+                  readOnly
+                  value={storage.getDirecteurNom() || 'Aucun Directeur Général actif inscrit'}
+                  title="Ce nom est celui du compte Directeur Général inscrit sur la plateforme"
+                  onChange={() => undefined}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
                 />
               </div>

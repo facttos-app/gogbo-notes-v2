@@ -23,7 +23,7 @@ const LIBELLES: Record<LigneImport['statut'], { texte: string; classe: string }>
 };
 
 export const ImportEleves: React.FC = () => {
-  const { currentUser, isCenseur, isDirecteur } = useAuth();
+  const { currentUser, isCenseur } = useAuth();
   const [classeId, setClasseId] = useState<string>('');
   const [texteColle, setTexteColle] = useState<string>('');
   const [nomFichier, setNomFichier] = useState<string>('');
@@ -46,10 +46,10 @@ export const ImportEleves: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableau, classeId, version]);
 
-  if (!isCenseur && !isDirecteur) {
+  if (!isCenseur) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-6 text-sm text-slate-700">
-        Cet espace est réservé au Censeur et au Directeur Général.
+        Cet espace est réservé au Censeur et au Concepteur.
       </div>
     );
   }
