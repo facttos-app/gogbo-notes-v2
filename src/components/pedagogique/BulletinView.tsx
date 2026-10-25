@@ -611,7 +611,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                       </span>
                     </div>
                     <p className="font-bold uppercase text-[12px] text-slate-900 tracking-wide">
-                      {parametres.directeur_nom || 'M. KOUDERIN Mathias'}
+                      {storage.getDirecteurNom() || '……………………………'}
                     </p>
                   </div>
                 </div>
@@ -844,7 +844,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                       </span>
                     </div>
                     <p className="font-bold uppercase text-[12px] text-slate-900 tracking-wide">
-                      {parametres.directeur_nom || 'M. KOUDERIN Mathias'}
+                      {storage.getDirecteurNom() || '……………………………'}
                     </p>
                   </div>
                 </div>
