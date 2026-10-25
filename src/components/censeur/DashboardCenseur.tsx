@@ -26,6 +26,9 @@ interface DashboardCenseurProps {
 
 export const DashboardCenseur: React.FC<DashboardCenseurProps> = ({ onNavigate }) => {
   const { currentUser } = useAuth();
+  const libelleCours = currentUser
+    ? storage.getLibelleMesCours(currentUser.id, storage.getActiveAnneeScolaire().libelle)
+    : '';
   const eleves = storage.getEleves();
   const activeEleves = eleves.filter((e) => e.statut === 'ACTIF');
   const profiles = storage.getProfiles();
@@ -129,13 +132,15 @@ export const DashboardCenseur: React.FC<DashboardCenseurProps> = ({ onNavigate }
             >
               <span>Inscrire des élèves (fichier)</span>
             </button>
+            {libelleCours && (
             <button
               onClick={() => onNavigate('pedagogique')}
               className="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-sm cursor-pointer"
             >
-              <span>Accéder à mes notes (SVT)</span>
+              <span>{libelleCours}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
+            )}
           </div>
         </div>
       </div>
