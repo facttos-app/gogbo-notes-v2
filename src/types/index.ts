@@ -407,6 +407,8 @@ export interface ProfesseurPrincipal {
   date_nomination?: string;
   date_fin?: string;
   motif_fin?: string;
+  // Autorisation donnée par le Censeur au PP d'inscrire des élèves dans sa classe
+  autorise_inscription?: boolean;
   created_at: string;
   updated_at: string;
 }
