@@ -1,5 +1,6 @@
 import React from 'react';
 import { storage } from '../../lib/storage';
+import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, Users, School, GraduationCap, Award, BookOpen, Clock, ArrowRight } from 'lucide-react';
 import { TabKey } from '../Navigation';
 
@@ -8,6 +9,10 @@ interface DirecteurDashboardProps {
 }
 
 export const DirecteurDashboard: React.FC<DirecteurDashboardProps> = ({ onNavigate }) => {
+  const { currentUser } = useAuth();
+  const libelleCours = currentUser
+    ? storage.getLibelleMesCours(currentUser.id, storage.getActiveAnneeScolaire().libelle)
+    : '';
   const eleves = storage.getEleves().filter((e) => e.statut === 'ACTIF');
   const classes = storage.getClasses();
   const profiles = storage.getProfiles().filter((p) => p.statut === 'ACTIF');
@@ -38,13 +43,15 @@ export const DirecteurDashboard: React.FC<DirecteurDashboardProps> = ({ onNaviga
             </p>
           </div>
 
+          {libelleCours && (
           <button
             onClick={() => onNavigate('pedagogique')}
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5 shadow-sm"
           >
-            <span>Mon cours de Mathématiques</span>
+            <span>{libelleCours}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
+          )}
         </div>
       </div>
 
