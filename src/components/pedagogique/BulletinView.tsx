@@ -538,59 +538,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                   </div>
                 </div>
 
-                {/* ZONE ASSIDUITÉ & NOTE DE CONDUITE (ATTRIBUTION STRICTE PROFESSEUR PRINCIPAL) */}
-                {(() => {
-                  const nc = storage.getNoteConduiteEleve(eleve.id, selectedPeriode.id, selectedAnnee.libelle);
-                  const absences = storage.getPresencesByEleve(eleve.id, selectedAnnee.libelle);
-                  const absNonJust = absences.filter(p => p.statut === 'ABSENT' && !p.justifie).length;
-                  const absJust = absences.filter(p => p.statut === 'ABSENT' && p.justifie).length;
-                  const retardsCount = absences.filter(p => p.statut === 'RETARD').length;
-
-                  return (
-                    <div className="border border-slate-900 p-3 mb-4 font-serif text-xs bg-slate-50/30 print:bg-transparent">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
-                            DISCIPLINE & NOTE DE CONDUITE (Professeur Principal)
-                          </span>
-                          <div className="flex justify-between items-center pt-1">
-                            <span>Note de Conduite Officielle :</span>
-                            <strong className="font-mono text-sm font-black text-slate-900">
-                              {nc ? `${nc.note.toFixed(1)} / 20` : 'En attente de saisie'}
-                            </strong>
-                          </div>
-                          <div className="flex justify-between text-[11px]">
-                            <span>Appréciation de conduite :</span>
-                            <strong className="italic text-slate-800">{nc?.appreciation || '—'}</strong>
-                          </div>
-                          <div className="text-[10px] text-slate-500 pt-0.5">
-                            Attribuée souverainement par le Professeur Principal • Sans coefficient matière
-                          </div>
-                        </div>
-
-                        <div className="space-y-1 sm:border-l sm:border-slate-300 sm:pl-4">
-                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
-                            ASSIDUITÉ & VIE SCOLAIRE (Surveillance Générale)
-                          </span>
-                          <div className="flex justify-between pt-1">
-                            <span>Absences justifiées :</span>
-                            <strong>{absJust}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Absences non justifiées :</span>
-                            <strong className={absNonJust > 0 ? 'text-red-700 font-bold' : ''}>{absNonJust}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Retards constatés :</span>
-                            <strong>{retardsCount}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
+                                {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
                 <div className="border border-slate-900 p-4 font-serif text-xs">
                   <div className="mb-4">
                     <span className="font-bold uppercase tracking-wider text-[11px] text-slate-900 block border-b border-slate-900 pb-1">
@@ -774,56 +722,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                   </div>
                 </div>
 
-                {/* ZONE ASSIDUITÉ & CONDUITE ANNUELLE */}
-                {(() => {
-                  const absences = storage.getPresencesByEleve(eleve.id, bulletinAnnuel.annee_scolaire);
-                  const absNonJust = absences.filter(p => p.statut === 'ABSENT' && !p.justifie).length;
-                  const absJust = absences.filter(p => p.statut === 'ABSENT' && p.justifie).length;
-                  const retardsCount = absences.filter(p => p.statut === 'RETARD').length;
-                  const allNc = storage.getNotesConduite(bulletinAnnuel.annee_scolaire).filter(n => n.eleve_id === eleve.id);
-                  const moyConduite = allNc.length > 0 ? (allNc.reduce((acc, curr) => acc + curr.note, 0) / allNc.length) : null;
-
-                  return (
-                    <div className="border border-slate-900 p-3 mb-4 font-serif text-xs bg-slate-50/30 print:bg-transparent">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
-                            SYNTHÈSE DE LA CONDUITE ANNUELLE (Professeur Principal)
-                          </span>
-                          <div className="flex justify-between items-center pt-1">
-                            <span>Moyenne de conduite annuelle :</span>
-                            <strong className="font-mono text-sm font-black text-slate-900">
-                              {moyConduite !== null ? `${moyConduite.toFixed(1)} / 20` : 'En attente'}
-                            </strong>
-                          </div>
-                          <div className="text-[10px] text-slate-500 pt-0.5">
-                            Évaluation globale de l'attitude et de la discipline scolaire de l'apprenant.
-                          </div>
-                        </div>
-
-                        <div className="space-y-1 sm:border-l sm:border-slate-300 sm:pl-4">
-                          <span className="font-bold uppercase text-[10px] text-slate-900 block border-b border-slate-300 pb-0.5">
-                            BILAN ANNUEL D'ASSIDUITÉ (Surveillance Générale)
-                          </span>
-                          <div className="flex justify-between pt-1">
-                            <span>Total absences justifiées :</span>
-                            <strong>{absJust}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total absences non justifiées :</span>
-                            <strong className={absNonJust > 0 ? 'text-red-700 font-bold' : ''}>{absNonJust}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Total retards constatés :</span>
-                            <strong>{retardsCount}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
+                                {/* ZONE EXCLUSIVE : OBSERVATION DU DIRECTEUR (CONFORME À LA RÈGLE 4) */}
                 <div className="border border-slate-900 p-4 font-serif text-xs">
                   <div className="mb-4">
                     <span className="font-bold uppercase tracking-wider text-[11px] text-slate-900 block border-b border-slate-900 pb-1">
