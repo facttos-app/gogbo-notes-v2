@@ -344,7 +344,11 @@ class StorageEngine {
         if (!sess?.session) return;
         for (let i = 0; i < changed.length; i += 200) {
           const chunk = changed.slice(i, i + 200);
-          const { error } = await client.from(spec.table).upsert(chunk, { onConflict: 'id' });
+          // Le journal d'audit est en ajout seul : un doublon est ignoré, jamais modifié.
+          const { error } =
+            spec.table === 'audit_logs'
+              ? await client.from(spec.table).upsert(chunk, { onConflict: 'id', ignoreDuplicates: true })
+              : await client.from(spec.table).upsert(chunk, { onConflict: 'id' });
           if (error) this.reportSyncError(spec.table, error.message);
         }
         if (removed.length > 0) {
@@ -402,6 +406,19 @@ class StorageEngine {
       details: `${autorise ? 'Autorisation' : 'Retrait de l\'autorisation'} d'inscrire des élèves pour le PP ${maj.profile_id} (classe ${maj.classe_id}).`,
     });
     return maj;
+  }
+
+  /** Libellé du bouton « Mon cours » : construit à partir des attributions réelles de l'utilisateur. */
+  public getLibelleMesCours(profileId: string, anneeScolaire: string): string {
+    const matieres = this.getMatieres();
+    const noms = new Set<string>();
+    for (const a of this.getAffectationsByProfile(profileId, anneeScolaire)) {
+      const m = matieres.find((x) => x.id === a.matiere_id);
+      if (m) noms.add(m.nom.split(' (')[0]);
+    }
+    const liste = Array.from(noms);
+    if (liste.length === 0) return '';
+    return liste.length === 1 ? `Mon cours de ${liste[0]}` : `Mes cours : ${liste.join(', ')}`;
   }
 
   /** Nom du Directeur affiché sur les bulletins : celui du compte Directeur Général inscrit sur la plateforme. */
