@@ -85,6 +85,16 @@ const MainAppContent: React.FC = () => {
   const [tabHistory, setTabHistory] = useState<TabKey[]>(() => [getDefaultTab(currentUser)]);
   const [bulletinTarget, setBulletinTarget] = useState<{ eleveId?: string; classeId?: string; periodeId?: string } | null>(null);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  // Alerte visible si un enregistrement vers la base centrale échoue (au lieu d'une erreur silencieuse)
+  const [erreurSync, setErreurSync] = useState<string | null>(null);
+  useEffect(() => {
+    const surErreur = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ table: string; message: string }>).detail;
+      setErreurSync(detail ? `${detail.table} : ${detail.message}` : 'erreur inconnue');
+    };
+    window.addEventListener('gogbo-sync-error', surErreur);
+    return () => window.removeEventListener('gogbo-sync-error', surErreur);
+  }, []);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [isMonCompteOpen, setIsMonCompteOpen] = useState(false);
   const [isSauvegardeModalOpen, setIsSauvegardeModalOpen] = useState(false);
@@ -256,6 +266,19 @@ const MainAppContent: React.FC = () => {
         onOpenMonCompte={() => setIsMonCompteOpen(true)}
         onOpenSauvegardeModal={() => setIsSauvegardeModalOpen(true)}
       />
+
+      {erreurSync && (
+        <div role="alert" className="bg-red-600 text-white text-xs px-4 py-2.5 flex items-start justify-between space-x-3">
+          <span>
+            <strong>Enregistrement non effectué.</strong> Votre dernière saisie n’a pas été enregistrée dans la base
+            centrale ({erreurSync}). Rechargez la page, vérifiez la saisie et recommencez ; si le message revient,
+            contactez l’administrateur.
+          </span>
+          <button type="button" onClick={() => setErreurSync(null)} className="font-bold shrink-0" aria-label="Fermer l’alerte">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Barre de navigation dynamique selon le profil avec déconnexion à gauche */}
       <Navigation 
