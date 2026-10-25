@@ -58,7 +58,8 @@ export const ComptableDashboard: React.FC<ComptableDashboardProps> = ({ onNaviga
 
   const classes = storage.getClasses();
   const allEleves = storage.getElevesByAnnee(selectedAnnee.libelle);
-  const canModify = !isArchive && (isComptable || isCenseur || isDirecteur || isConcepteur);
+  // Seul le Comptable renseigne l'espace comptabilité ; l'administration et le Concepteur le consultent en lecture seule.
+  const canModify = !isArchive && isComptable;
 
   // -------------------------------------------------------------
   // DONNÉES FINANCIÈRES RÉELLES (SANS DONNÉES FICTIVES)
