@@ -90,6 +90,8 @@ const MainAppContent: React.FC = () => {
   useEffect(() => {
     const surErreur = (ev: Event) => {
       const detail = (ev as CustomEvent<{ table: string; message: string }>).detail;
+      // Le journal d'audit n'est pas une saisie de l'utilisateur : son échec ne doit pas alarmer (il reste dans la console).
+      if (detail && detail.table === 'audit_logs') return;
       setErreurSync(detail ? `${detail.table} : ${detail.message}` : 'erreur inconnue');
     };
     window.addEventListener('gogbo-sync-error', surErreur);
