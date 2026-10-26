@@ -70,11 +70,10 @@ export const AppelCoursSeance: React.FC<AppelCoursSeanceProps> = ({
   }, [selectedClasseId, anneeLibelle]);
 
   const availableSeances = useMemo(() => {
-    if (restrictToTeacher && !canAdmin) {
-      return allSeancesClasse.filter((s) => s.enseignant_id === currentUser?.id);
-    }
+    // Un enseignant voit toutes les séances des classes où il fait cours : chacun valide l'appel de sa séance
+    // (ex. 08h-10h puis 10h-12h), et peut aussi valider l'appel d'un collègue de la même classe.
     return allSeancesClasse;
-  }, [allSeancesClasse, restrictToTeacher, canAdmin, currentUser?.id]);
+  }, [allSeancesClasse]);
 
   const [selectedSeanceId, setSelectedSeanceId] = useState<string>('');
 
