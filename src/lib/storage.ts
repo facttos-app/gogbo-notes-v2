@@ -3903,10 +3903,22 @@ class StorageEngine {
     items: Array<{ eleve_id: string; statut: StatutPresence; motif?: string; heure_retard?: string; justifie?: boolean }>,
     operator: UserProfile
   ): EnregistrementPresence[] {
+    // Tout enseignant qui fait cours dans la classe (attribution active) peut valider l'appel d'une séance ;
+    // le Surveillant Général et l'administration aussi.
     const isOwner = seance.enseignant_id === operator.id;
-    const canRecord = isOwner || operator.role === 'SURVEILLANT_GENERAL' || this.canAdminister(operator);
+    const enseigneDansLaClasse = this.getItem<AffectationPedagogique[]>(STORAGE_KEYS.AFFECTATIONS, []).some(
+      (a) =>
+        a.profile_id === operator.id &&
+        a.classe_id === seance.classe_id &&
+        a.annee_scolaire === seance.annee_scolaire &&
+        a.statut === 'ACTIF'
+    );
+    const canRecord =
+      isOwner || enseigneDansLaClasse || operator.role === 'SURVEILLANT_GENERAL' || this.canAdminister(operator);
     if (!canRecord) {
-      throw new Error("Action non autorisée : Seul l'enseignant titulaire de la séance ou la Surveillance peut enregistrer cet appel.");
+      throw new Error(
+        "Action non autorisée : seuls les enseignants qui font cours dans cette classe et le Surveillant Général peuvent enregistrer l'appel."
+      );
     }
 
     const allPresences = this.getPresences();
