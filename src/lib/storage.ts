@@ -2938,6 +2938,60 @@ class StorageEngine {
   /**
    * Saisie sécurisée d'une note (Section 10 & 16)
    */
+  /**
+   * Efface une note déjà saisie (ex. interrogation à annuler). La note disparaît : elle n'est JAMAIS comptée comme 0.
+   * Mêmes conditions que la saisie : titulaire de l'attribution, période non verrouillée, année non clôturée.
+   */
+  public deleteNote(
+    data: {
+      eleve_id: string;
+      affectation_id: string;
+      periode_id: string;
+      type_evaluation: Note['type_evaluation'];
+    },
+    user: UserProfile
+  ): boolean {
+    const aff = this.getAffectations().find((a) => a.id === data.affectation_id && a.statut === 'ACTIF');
+    if (!aff) {
+      throw new Error('Attribution de classe introuvable ou inactive.');
+    }
+    if (aff.profile_id !== user.id) {
+      throw new Error("Vous ne pouvez effacer que les notes d'une attribution de classe qui vous a été accordée.");
+    }
+    const per = this.getPeriodes().find((p) => p.id === data.periode_id);
+    if (!per || per.is_locked) {
+      throw new Error('Suppression refusée : la période sélectionnée est clôturée ou verrouillée.');
+    }
+    const anneeObj = this.getAnneesScolaires().find((a) => a.libelle === per.annee_scolaire);
+    if (anneeObj && anneeObj.statut === 'CLOTUREE') {
+      throw new Error(`Suppression refusée : l'année scolaire ${per.annee_scolaire} est clôturée et archivée.`);
+    }
+
+    const notes = this.getNotes();
+    const idx = notes.findIndex(
+      (n) =>
+        n.eleve_id === data.eleve_id &&
+        n.affectation_id === data.affectation_id &&
+        n.periode_id === data.periode_id &&
+        (n.type_evaluation === data.type_evaluation ||
+          (data.type_evaluation === 'INTERROGATION_1' && n.type_evaluation === 'INTERROGATION'))
+    );
+    if (idx === -1) return false;
+
+    const [supprimee] = notes.splice(idx, 1);
+    this.setItem(STORAGE_KEYS.NOTES, notes);
+    this.addAuditLog({
+      user_id: user.id,
+      user_nom: `${user.nom} ${user.prenom}`,
+      user_role: user.role,
+      action: 'SUPPRESSION_NOTE',
+      table_cible: 'notes',
+      record_id: supprimee.id,
+      details: `Note ${supprimee.type_evaluation} (${supprimee.valeur}/20) effacée pour l'élève ${supprimee.eleve_id}.`,
+    });
+    return true;
+  }
+
   public saveNote(
     data: {
       eleve_id: string;
