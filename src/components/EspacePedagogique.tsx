@@ -239,6 +239,16 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
     return note !== undefined ? String(note.valeur) : '';
   };
 
+  // Note déjà enregistrée pour cet élève et ce type d'évaluation (lecture à jour)
+  const noteEnregistree = (eleveId: string, type: EvalInputKey): boolean => {
+    if (!currentAff) return false;
+    return storage.getNotesByAffectationAndPeriode(currentAff.id, selectedPeriodeId).some(
+      (n) =>
+        n.eleve_id === eleveId &&
+        (n.type_evaluation === type || (type === 'INTERROGATION_1' && n.type_evaluation === 'INTERROGATION'))
+    );
+  };
+
   const handleInputChange = (eleveId: string, type: EvalInputKey, val: string) => {
     if (!canEdit) return;
     const cleaned = val.replace(',', '.');
@@ -266,8 +276,35 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
       'DEVOIR_2',
     ];
 
+    // Cases vidées alors qu'une note existait : la note est effacée (jamais enregistrée comme 0)
+    const aEffacer = evalTypes.filter((type) => getInputValue(eleve.id, type).trim() === '' && noteEnregistree(eleve.id, type));
+    if (
+      aEffacer.length > 0 &&
+      !window.confirm(
+        `Effacer ${aEffacer.length} note(s) de ${eleve.nom} ${eleve.prenom} ? Une note effacée n'est pas comptée comme 0.`
+      )
+    ) {
+      return;
+    }
+
     let savedCount = 0;
+    let deletedCount = 0;
     const errors: string[] = [];
+
+    aEffacer.forEach((type) => {
+      try {
+        if (
+          storage.deleteNote(
+            { eleve_id: eleve.id, affectation_id: currentAff.id, periode_id: selectedPeriodeId, type_evaluation: type as TypeEvaluation },
+            currentUser
+          )
+        ) {
+          deletedCount++;
+        }
+      } catch (e: unknown) {
+        errors.push(e instanceof Error ? e.message : 'Erreur');
+      }
+    });
 
     evalTypes.forEach((type) => {
       const rawVal = getInputValue(eleve.id, type);
@@ -297,12 +334,12 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
 
     if (errors.length > 0) {
       setStatusMessage({ type: 'error', text: `Erreurs pour ${eleve.nom}: ${errors.join(', ')}` });
-    } else if (savedCount > 0) {
+    } else if (savedCount > 0 || deletedCount > 0) {
       triggerRecalculationVisual();
       setLastSavedTime(new Date().toLocaleTimeString('fr-FR'));
       setStatusMessage({
         type: 'success',
-        text: `✓ Notes enregistrées avec succès pour ${eleve.nom} ${eleve.prenom} (${savedCount} note(s)). Moyenne et rang actualisés.`,
+        text: `✓ Notes enregistrées avec succès pour ${eleve.nom} ${eleve.prenom} (${savedCount} enregistrée(s), ${deletedCount} effacée(s) : une note effacée n'est jamais comptée comme 0). Moyenne et rang actualisés.`,
       });
     } else {
       setStatusMessage({ type: 'error', text: `Aucune note saisie pour ${eleve.nom} ${eleve.prenom}.` });
@@ -322,8 +359,38 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
       'DEVOIR_2',
     ];
 
+    // Cases vidées alors qu'une note existait : la note est effacée (jamais enregistrée comme 0)
+    const aEffacer: Array<{ eleveId: string; type: EvalInputKey }> = [];
+    eleves.forEach((el) =>
+      evalTypes.forEach((type) => {
+        if (getInputValue(el.id, type).trim() === '' && noteEnregistree(el.id, type)) aEffacer.push({ eleveId: el.id, type });
+      })
+    );
+    if (
+      aEffacer.length > 0 &&
+      !window.confirm(`Effacer ${aEffacer.length} note(s) dans cette classe ? Une note effacée n'est pas comptée comme 0.`)
+    ) {
+      return;
+    }
+
     let totalSaved = 0;
+    let totalDeleted = 0;
     const errors: string[] = [];
+
+    aEffacer.forEach(({ eleveId, type }) => {
+      try {
+        if (
+          storage.deleteNote(
+            { eleve_id: eleveId, affectation_id: currentAff.id, periode_id: selectedPeriodeId, type_evaluation: type as TypeEvaluation },
+            currentUser
+          )
+        ) {
+          totalDeleted++;
+        }
+      } catch (e: unknown) {
+        errors.push(e instanceof Error ? e.message : 'Erreur');
+      }
+    });
 
     eleves.forEach((el) => {
       evalTypes.forEach((type) => {
@@ -358,12 +425,12 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
         type: 'error',
         text: `Certaines notes n'ont pas pu être enregistrées : ${errors.slice(0, 3).join(' • ')}${errors.length > 3 ? ` (+${errors.length - 3} autres)` : ''}`,
       });
-    } else if (totalSaved > 0) {
+    } else if (totalSaved > 0 || totalDeleted > 0) {
       triggerRecalculationVisual();
       setLastSavedTime(new Date().toLocaleTimeString('fr-FR'));
       setStatusMessage({
         type: 'success',
-        text: `✓ Succès total : ${totalSaved} note(s) enregistrée(s) dans la base de données. Moyennes de classe, classements et bulletins mis à jour.`,
+        text: `✓ Succès total : ${totalDeleted > 0 ? `${totalDeleted} note(s) effacée(s) (jamais comptées comme 0), ` : ''}${totalSaved} note(s) enregistrée(s) dans la base de données. Moyennes de classe, classements et bulletins mis à jour.`,
       });
     } else {
       setStatusMessage({ type: 'error', text: 'Aucune nouvelle note à enregistrer dans la classe.' });
@@ -641,14 +708,14 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                   </span>
                   <span>•</span>
                   <span className="inline-flex items-center space-x-1.5">
-                    <span>Coefficient en {classe?.nom} : <strong className="text-slate-900">{coefClasse}</strong></span>
+                    <span>Coefficient en {classe?.nom} : <strong className={coefClasse > 0 ? 'text-slate-900' : 'text-amber-700'}>{coefClasse > 0 ? coefClasse : 'non défini'}</strong></span>
                     {canEdit && !isArchive && (
                       <button
                         onClick={() => setIsEditingCoef(!isEditingCoef)}
                         className="text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded font-bold cursor-pointer"
                         title="Modifier le coefficient de cette matière pour cette classe uniquement"
                       >
-                        {isEditingCoef ? 'Fermer' : '✎ Modifier Coef'}
+                        {isEditingCoef ? 'Fermer' : coefClasse > 0 ? '✎ Modifier Coef' : '✎ Définir le coefficient'}
                       </button>
                     )}
                   </span>
@@ -669,7 +736,8 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
                       type="number"
                       min="1"
                       max="10"
-                      value={newCoefValue}
+                      value={newCoefValue > 0 ? newCoefValue : ''}
+                      placeholder="ex. 2"
                       onChange={(e) => setNewCoefValue(Number(e.target.value))}
                       className="w-16 bg-white border border-slate-300 rounded px-2 py-0.5 font-bold text-slate-900 text-center"
                     />
@@ -765,6 +833,12 @@ export const EspacePedagogique: React.FC<EspacePedagogiqueProps> = ({ onOpenBull
           {/* Contenu selon l'onglet actif */}
           {activeTab === 'saisie' ? (
             <div className="p-4 sm:p-6 space-y-4">
+              {canEdit && (
+                <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  Pour <strong>effacer</strong> une note : videz sa case puis enregistrez. Une note effacée n’est{' '}
+                  <strong>jamais comptée comme 0</strong> ; pour donner la note 0, tapez 0.
+                </div>
+              )}
               {/* Alerte si la période est verrouillée */}
               {periode?.is_locked && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center space-x-2">
